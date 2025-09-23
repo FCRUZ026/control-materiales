@@ -54,7 +54,6 @@
   .left{text-align:left}
   .badge{display:inline-block; padding:4px 8px; border:1px solid var(--border);
          border-radius:999px; background:#0a1323; color:#cbd5e1; font-size:12px}
-  .disabled{opacity:.6}
 
   /* Móvil: tarjetas con etiquetas */
   @media (max-width:640px){
@@ -70,6 +69,25 @@
   .msg{margin-top:8px; font-size:14px}
   .msg.error{color:var(--danger)}
   .msg.ok{color:var(--ok)}
+
+  /* Modal */
+  .modal{
+    position:fixed; inset:0; background:rgba(0,0,0,.5);
+    display:none; align-items:center; justify-content:center; padding:16px; z-index:50;
+  }
+  .modal.open{display:flex}
+  .modal-card{
+    width:min(680px, 100%); background:#0b1221; border:1px solid var(--border);
+    border-radius:16px; box-shadow:var(--shadow); padding:16px;
+  }
+  .modal-header{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px}
+  .modal-header h3{margin:0; font-size:18px}
+  .modal-body{display:grid; gap:12px}
+  .row{display:grid; gap:10px}
+  @media (min-width:620px){ .row{ grid-template-columns:1fr 1fr 1fr } }
+  .chips{display:flex; flex-wrap:wrap; gap:6px}
+  .chip{background:#0a1323; border:1px solid var(--border); padding:4px 8px; border-radius:999px; font-size:12px}
+  video{width:100%; border-radius:12px; border:1px solid var(--border)}
 </style>
 </head>
 <body>
@@ -128,6 +146,53 @@
   </div>
 </div>
 
+<!-- Modal Series -->
+<div id="modal" class="modal" aria-hidden="true">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>Ingreso de series</h3>
+      <button id="mClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="row">
+        <div>
+          <label>Método</label>
+          <select id="mMetodo">
+            <option value="uno">Manual 1×1</option>
+            <option value="rango">Rango</option>
+            <option value="scan">Escanear (cámara)</option>
+          </select>
+        </div>
+        <div id="mUno" style="display:block">
+          <label>Agregar serie</label>
+          <input id="mSerie" type="text" placeholder="Ej: ABC123" />
+          <div class="chips" id="mChips"></div>
+        </div>
+        <div id="mRango" style="display:none">
+          <label>Prefijo</label>
+          <input id="mPrefijo" type="text" placeholder="ABC" />
+          <label>Inicio</label>
+          <input id="mIni" type="number" inputmode="numeric" placeholder="1" />
+          <label>Fin</label>
+          <input id="mFin" type="number" inputmode="numeric" placeholder="50" />
+        </div>
+      </div>
+
+      <div id="mScan" style="display:none">
+        <label>Cámara</label>
+        <video id="mVideo" playsinline></video>
+        <div class="hint" id="mScanHint">Apunta al código. Añadirá cada lectura válida.</div>
+      </div>
+
+      <div style="display:flex; gap:8px; margin-top:10px">
+        <button id="mAddUno">Agregar</button>
+        <button id="mGenRango">Generar rango</button>
+        <button id="mOk" class="primary">Usar series</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
   /* ===== CONFIG ===== */
   const SHEET_ID  = "1dtIWNjOyysVWy9Z0aIkygfwn2h6ihFXAp1nnZaQ8JXY";
@@ -142,9 +207,10 @@
   // A=0 Cuadrilla, B=1 Código, C=2 Nombre, D=3 TIPOMATERIAL, I=8 FISICO TEORICO
   const COL = { CUADRILLA:0, CODIGO:1, NOMBRE:2, TIPO:3, FIS_TEO:8 };
 
-  // ENDPOINT de Apps Script (cámbialo cuando crees tu Web App)
-  // Debe aceptar POST JSON y escribir en la pestaña "registro".
-  const ENDPOINT_URL = ""; // <-- pega aquí tu URL de Web App cuando la tengas
+ 
+// ENDPOINT de Apps Script (ya desplegado como Web App)
+const ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbz2vjCOAoW8xlvVOnmTzfPWXzMAod3YFuPqBNBBBAIjL81d4f5Ac_gi2M7jTvkk6E0a/exec";
+
 
   /* ===== ELEMENTOS ===== */
   const selIngeniero = document.getElementById("selIngeniero");
@@ -156,8 +222,29 @@
   const bar          = document.getElementById("bar");
   const progTxt      = document.getElementById("progTxt");
 
+  // Modal refs
+  const modal = document.getElementById("modal");
+  const mClose= document.getElementById("mClose");
+  const mMetodo=document.getElementById("mMetodo");
+  const mUno  = document.getElementById("mUno");
+  const mRango= document.getElementById("mRango");
+  const mScan = document.getElementById("mScan");
+  const mSerie= document.getElementById("mSerie");
+  const mChips= document.getElementById("mChips");
+  const mPrefijo=document.getElementById("mPrefijo");
+  const mIni  = document.getElementById("mIni");
+  const mFin  = document.getElementById("mFin");
+  const mAddUno=document.getElementById("mAddUno");
+  const mGenRango=document.getElementById("mGenRango");
+  const mOk   = document.getElementById("mOk");
+  const mVideo= document.getElementById("mVideo");
+  const mScanHint=document.getElementById("mScanHint");
+
   let materiales = []; // todos
   let cuadrillas = [];
+  let hasUnsaved = false; // para aviso al recargar
+  let targetSeriesInput = null; // input .series de la fila que abrió el modal
+  let detector, camStream, chipSet = new Set(); // lector y colec. de series
 
   /* ===== INIT ===== */
   document.addEventListener("DOMContentLoaded", async () => {
@@ -166,6 +253,17 @@
     await loadMateriales();
     updateControls();
   });
+
+  // Aviso si hay cambios sin registrar
+  window.addEventListener("beforeunload", (e)=>{
+    if(hasUnsaved){
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  });
+
+  function markUnsaved(){ hasUnsaved = true; }
+  function clearUnsaved(){ hasUnsaved = false; }
 
   async function gFetch(rangeA1){
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(rangeA1)}?key=${API_KEY}`;
@@ -258,10 +356,10 @@
       const cu  = r[COL.CUADRILLA] ?? "";
       const co  = r[COL.CODIGO] ?? "";
       const no  = r[COL.NOMBRE] ?? "";
-      const tp  = (r[COL.TIPO] ?? "").toString().toLowerCase(); // "seriado"|"no seriado"
-      const ft  = (r[COL.FIS_TEO] ?? "").toString();
+      const tp  = (r[COL.TIPO] ?? "").toString().toLowerCase(); // "seriado"/"no seriado"
+      const ft  = (r[COL.FIS_TEO] ?? "0").toString();
 
-      const isSeriado = tp.includes("seriado"); // solo si dice Seriado
+      const isSeriado = tp.includes("seriado");
       const tr  = document.createElement("tr");
 
       tr.innerHTML = `
@@ -269,7 +367,7 @@
         <td data-label="Cuadrilla">${cu}</td>
         <td data-label="Código"><span class="badge"># ${co}</span></td>
         <td class="left" data-label="Nombre">${no}</td>
-        <td data-label="Físico Teórico">${ft || "0"}</td>
+        <td data-label="Físico Teórico">${ft}</td>
         <td data-label="Ingreso">
           <select class="modo" ${!isSeriado ? 'disabled title="Solo cantidad (No Seriado)"' : ""}>
             ${isSeriado
@@ -277,41 +375,35 @@
               : '<option value="cantidad" selected>Cantidad</option>'}
           </select>
         </td>
-        <td data-label="Cantidad"><input type="number" class="cant" inputmode="decimal" min="0" step="any" placeholder="0" ${isSeriado ? "" : ""}></td>
+        <td data-label="Cantidad"><input type="number" class="cant" inputmode="decimal" min="0" step="any" placeholder="0"></td>
         <td data-label="Serie(s)"><input type="text" class="series" placeholder="Ej: ABC123,ABC124" ${isSeriado ? "" : "disabled"}></td>
       `;
 
-      // Inicializa modo según seriado
       const modo = tr.querySelector(".modo");
       const cant = tr.querySelector(".cant");
       const ser  = tr.querySelector(".series");
-      setMode(isSeriado ? "cantidad" : "cantidad", cant, ser, isSeriado);
 
+      // abrir wizard si cambia a "serie"
       if(isSeriado){
-        modo.addEventListener("change", ()=> setMode(modo.value, cant, ser, true));
+        modo.addEventListener("change", ()=>{
+          if(modo.value==="serie"){
+            targetSeriesInput = ser;
+            openSeriesWizard();
+          }else{
+            ser.value = "";
+          }
+          updateProgress(); markUnsaved();
+        });
       }
 
-      // recalcular progreso cuando cambian campos / checkbox
-      tr.querySelector(".chk").addEventListener("change", updateProgress);
-      cant.addEventListener("input", updateProgress);
-      ser.addEventListener("input", updateProgress);
+      tr.querySelector(".chk").addEventListener("change", ()=>{ updateProgress(); markUnsaved(); });
+      cant.addEventListener("input", ()=>{ updateProgress(); markUnsaved(); });
+      ser.addEventListener("input", ()=>{ updateProgress(); markUnsaved(); });
 
       frag.appendChild(tr);
     });
     tbody.appendChild(frag);
     updateProgress();
-  }
-
-  function setMode(mode, qtyInput, seriesInput, isSeriado){
-    if(!isSeriado){
-      qtyInput.disabled = false; seriesInput.disabled = true; seriesInput.value="";
-      return;
-    }
-    if(mode==="cantidad"){
-      qtyInput.disabled = false; seriesInput.disabled = true; seriesInput.value="";
-    }else{
-      qtyInput.disabled = true;  qtyInput.value=""; seriesInput.disabled = false;
-    }
   }
 
   function updateProgress(){
@@ -326,7 +418,7 @@
         const modo = tr.querySelector(".modo")?.value || "cantidad";
         const cant = tr.querySelector(".cant");
         const ser  = tr.querySelector(".series");
-        const seriadoEnabled = !ser.disabled; // si está habilitado, puede ser por serie
+        const seriadoEnabled = !ser.disabled;
 
         let ok=false;
         if(seriadoEnabled && modo==="serie"){
@@ -344,450 +436,226 @@
     progTxt.textContent = `${valid}/${checked}`;
   }
 
-  // Validación + “envío”
+  // ===== Modal Series =====
+  function openSeriesWizard(){
+    chipSet.clear(); renderChips();
+    mSerie.value = ""; mPrefijo.value=""; mIni.value=""; mFin.value="";
+    mMetodo.value="uno";
+    mUno.style.display="block"; mRango.style.display="none"; mScan.style.display="none";
+    modal.classList.add("open");
+    startScanner(false);
+  }
+  function closeSeriesWizard(){
+    modal.classList.remove("open");
+    startScanner(false); // detener
+  }
+  mClose.addEventListener("click", closeSeriesWizard);
+  modal.addEventListener("click", (e)=>{ if(e.target===modal) closeSeriesWizard(); });
+
+  mMetodo.addEventListener("change", ()=>{
+    const v = mMetodo.value;
+    mUno.style.display   = v==="uno"   ? "block":"none";
+    mRango.style.display = v==="rango" ? "block":"none";
+    mScan.style.display  = v==="scan"  ? "block":"none";
+    startScanner(v==="scan");
+  });
+
+  mAddUno.addEventListener("click", ()=>{
+    const s = (mSerie.value||"").trim();
+    if(!s) return;
+    chipSet.add(s);
+    mSerie.value=""; renderChips();
+  });
+
+  mGenRango.addEventListener("click", ()=>{
+    const p = (mPrefijo.value||"");
+    const ini = parseInt(mIni.value,10);
+    const fin = parseInt(mFin.value,10);
+    if(!(ini>=0) || !(fin>=ini)) return;
+    const width = Math.max(mIni.value.length, mFin.value.length); // ceros a la izq
+    for(let n=ini; n<=fin; n++){
+      const num = String(n).padStart(width,"0");
+      chipSet.add(`${p}${num}`);
+    }
+    renderChips();
+  });
+
+  function renderChips(){
+    mChips.innerHTML = "";
+    chipSet.forEach(val=>{
+      const span = document.createElement("span");
+      span.className="chip"; span.textContent = val;
+      mChips.appendChild(span);
+    });
+  }
+
+  mOk.addEventListener("click", ()=>{
+    const list = Array.from(chipSet);
+    if(targetSeriesInput){
+      targetSeriesInput.value = list.join(",");
+      updateProgress(); markUnsaved();
+    }
+    closeSeriesWizard();
+  });
+
+  // Escáner con BarcodeDetector (si existe)
+  async function startScanner(on){
+    try{
+      if(!on){
+        if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
+        return;
+      }
+      if(!('BarcodeDetector' in window)){
+        mScanHint.textContent = "Tu navegador no soporta BarcodeDetector. Usa Manual 1×1 o Rango.";
+        return;
+      }
+      if(!detector){
+        detector = new BarcodeDetector({ formats: ['code_128','qr_code','ean_13','ean_8','code_39','upc_a','upc_e'] });
+      }
+      camStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
+      mVideo.srcObject = camStream; await mVideo.play();
+      mScanHint.textContent = "Apunta al código. Se añadirá automáticamente.";
+      scanLoop();
+    }catch(e){
+      console.error(e);
+      mScanHint.textContent = "No se pudo abrir la cámara. Permite el acceso o usa otro método.";
+    }
+  }
+
+  async function scanLoop(){
+    if(!detector || !mVideo.srcObject) return;
+    try{
+      const codes = await detector.detect(mVideo);
+      if(codes && codes.length){
+        codes.forEach(c=> chipSet.add((c.rawValue||"").trim()));
+        renderChips();
+      }
+    }catch(e){ /* ignore */ }
+    requestAnimationFrame(scanLoop);
+  }
+
+  // ===== Registrar (igual que antes, con aviso de no perder datos) =====
   btnRegistrar.addEventListener("click", async ()=>{
-    statusMsg.textContent = "";
-    const rows = Array.from(tbody.querySelectorAll("tr"));
-    if(rows.length===0){ return; }
+  statusMsg.textContent = "";
+  const rows = Array.from(tbody.querySelectorAll("tr"));
+  if(rows.length===0){ return; }
 
-    const errores = [];
-    const registros = [];
+  const errores = [];
+  const registros = [];
+  const filaIndexMap = []; // para mapear índice del payload -> <tr>
 
-    rows.forEach(tr=>{
-      const chk   = tr.querySelector(".chk");
-      if(!chk || !chk.checked) return;
+  rows.forEach((tr, idxInDom)=>{
+    const chk   = tr.querySelector(".chk");
+    if(!chk || !chk.checked) return;
 
-      const cuadr = tr.children[1]?.innerText?.trim();
-      const cod   = tr.children[2]?.innerText?.replace("#","").trim();
-      const nom   = tr.children[3]?.innerText?.trim();
-      const modo  = tr.querySelector(".modo")?.value || "cantidad";
-      const cant  = tr.querySelector(".cant");
-      const ser   = tr.querySelector(".series");
-      const seriadoEnabled = !ser.disabled;
+    const cuadr = tr.children[1]?.innerText?.trim();
+    const cod   = tr.children[2]?.innerText?.replace("#","").trim();
+    const nom   = tr.children[3]?.innerText?.trim();
+    const modo  = tr.querySelector(".modo")?.value || "cantidad";
+    const cant  = tr.querySelector(".cant");
+    const ser   = tr.querySelector(".series");
+    const seriadoEnabled = !ser.disabled;
 
-      // limpia estilos
-      cant.classList.remove("errorCell");
-      ser.classList.remove("errorCell");
+    // limpia estilos
+    cant.classList.remove("errorCell");
+    ser.classList.remove("errorCell");
 
-      if(seriadoEnabled && modo==="serie"){
-        const val = (ser.value||"").trim();
-        if(!val){ ser.classList.add("errorCell"); errores.push(`Serie(s) faltante(s) para ${cod} – ${nom}`); return; }
-        registros.push({cuadrilla:cuadr, reviso: selIngeniero.value, codigo:cod, cantidad:"", seriado:"Y", serie:val, fecha:new Date().toISOString()});
-      }else{
-        const val = parseFloat(cant.value);
-        if(!(val>0)){ cant.classList.add("errorCell"); errores.push(`Cantidad faltante para ${cod} – ${nom}`); return; }
-        registros.push({cuadrilla:cuadr, reviso: selIngeniero.value, codigo:cod, cantidad:val, seriado:"N", serie:"", fecha:new Date().toISOString()});
-      }
-    });
-
-    if(errores.length){
-      statusMsg.className="msg error";
-      statusMsg.textContent = `Revisa: ${errores.join(" • ")}`;
-      return;
-    }
-    if(registros.length===0){
-      statusMsg.className="msg error";
-      statusMsg.textContent = "No marcaste ninguna fila para registrar.";
-      return;
-    }
-
-    // Envío (opcional): requiere Apps Script Web App
-    if(!ENDPOINT_URL){
-      console.log("Payload listo para enviar:", registros);
-      statusMsg.className="msg ok";
-      statusMsg.textContent = `OK: ${registros.length} registro(s) válido(s). (Configura ENDPOINT_URL para escribir en 'registro')`;
-      return;
-    }
-
-    try{
-      btnRegistrar.disabled = true;
-      statusMsg.className="msg";
-      statusMsg.textContent = "Enviando…";
-      const resp = await fetch(ENDPOINT_URL, {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ registros })
-      });
-      if(!resp.ok) throw new Error("HTTP "+resp.status);
-      statusMsg.className="msg ok";
-      statusMsg.textContent = "Registrado correctamente.";
-    }catch(e){
-      console.error(e);
-      statusMsg.className="msg error";
-      statusMsg.textContent = "Error al registrar. Revisa el ENDPOINT_URL.";
-    }finally{
-      btnRegistrar.disabled = false;
+    if(seriadoEnabled && modo==="serie"){
+      const val = (ser.value||"").trim();
+      if(!val){ ser.classList.add("errorCell"); errores.push(`Serie(s) faltante(s) para ${cod} – ${nom}`); return; }
+      registros.push({cuadrilla:cuadr, reviso: selIngeniero.value, codigo:cod, cantidad:"", seriado:"Y", serie:val, fecha:new Date().toISOString()});
+      filaIndexMap.push(idxInDom);
+    }else{
+      const val = parseFloat(cant.value);
+      if(!(val>0)){ cant.classList.add("errorCell"); errores.push(`Cantidad faltante para ${cod} – ${nom}`); return; }
+      registros.push({cuadrilla:cuadr, reviso: selIngeniero.value, codigo:cod, cantidad:val, seriado:"N", serie:"", fecha:new Date().toISOString()});
+      filaIndexMap.push(idxInDom);
     }
   });
-</script>
-</body>
-</html>
 
-<script>
-  /* ===== CONFIG ===== */
-  const SHEET_ID  = "1dtIWNjOyysVWy9Z0aIkygfwn2h6ihFXAp1nnZaQ8JXY";
-  const API_KEY   = "AIzaSyAnPJKpsn34tTYdiKK0aiRW78r3NhQOx9s";
-
-  // Pestañas
-  const ING_SHEET        = "Ingenieros"; // B2:B = nombres
-  const CUADRILLAS_SHEET = "cuadrillas"; // A2:A = cuadrillas
-  const MATERIALS_SHEET  = "base";       // A:I (min)
-
-  // Índices en "base" (0-index)
-  const COL = { CUADRILLA:0, CODIGO:1, NOMBRE:2, TIPO:3, FIS_TEO:8 }; // Físico Teórico en I
-
-  /* ===== ELEMENTOS ===== */
-  const selIngeniero = document.getElementById("selIngeniero");
-  const selCuadrilla = document.getElementById("selCuadrilla");
-  const filtro       = document.getElementById("filtro");
-  const tbody        = document.querySelector("#materialTable tbody");
-  const btnRegistrar = document.getElementById("btnRegistrar");
-  const statusMsg    = document.getElementById("status");
-
-  let materiales = []; // todos
-  let cuadrillas = [];
-
-  /* ===== INIT ===== */
-  document.addEventListener("DOMContentLoaded", async () => {
-    await loadIngenieros();
-    await loadCuadrillas();
-    await loadMateriales();
-    updateControls();
-  });
-
-  async function gFetch(rangeA1){
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(rangeA1)}?key=${API_KEY}`;
-    const res = await fetch(url);
-    if(!res.ok) throw new Error(`HTTP ${res.status} al leer ${rangeA1}`);
-    const data = await res.json();
-    return data.values || [];
+  if(errores.length){
+    statusMsg.className="msg error";
+    statusMsg.textContent = `Revisa: ${errores.join(" • ")}`;
+    return;
+  }
+  if(registros.length===0){
+    statusMsg.className="msg error";
+    statusMsg.textContent = "No marcaste ninguna fila para registrar.";
+    return;
   }
 
-  async function loadIngenieros(){
-    try{
-      selIngeniero.innerHTML = `<option value="">Cargando…</option>`;
-      const v = await gFetch(`${ING_SHEET}!B2:B`);
-      selIngeniero.innerHTML = `<option value="">— Selecciona —</option>`;
-      v.forEach(r=>{
-        const name = r?.[0]?.trim();
-        if(name){
-          const opt=document.createElement("option");
-          opt.value=name; opt.textContent=name;
-          selIngeniero.appendChild(opt);
-        }
-      });
-    }catch(e){ selIngeniero.innerHTML=`<option value="">(Error al cargar)</option>`; console.error(e); }
-  }
+  try{
+    btnRegistrar.disabled = true;
+    statusMsg.className="msg";
+    statusMsg.textContent = "Enviando…";
 
-  async function loadCuadrillas(){
-    try{
-      selCuadrilla.innerHTML = `<option value="">Cargando…</option>`;
-      const v = await gFetch(`${CUADRILLAS_SHEET}!A2:A`);
-      cuadrillas = v.map(r=>r?.[0]).filter(Boolean).map(s=>s.toString().trim());
-      cuadrillas.sort((a,b)=>a.localeCompare(b,'es'));
-      selCuadrilla.innerHTML = `<option value="">— Selecciona —</option>`;
-      cuadrillas.forEach(c=>{
-        const opt=document.createElement("option");
-        opt.value=c; opt.textContent=c;
-        selCuadrilla.appendChild(opt);
-      });
-    }catch(e){ selCuadrilla.innerHTML=`<option value="">(Error al cargar)</option>`; console.error(e); }
-  }
-
-  async function loadMateriales(){
-    try{
-      const v = await gFetch(`${MATERIALS_SHEET}!A:I`);
-      materiales = v.slice(1); // sin encabezado
-    }catch(e){ console.error("Materiales:", e); materiales=[]; }
-  }
-
-  function updateControls(){
-    const enabled = selIngeniero.value !== "";
-    selCuadrilla.disabled = !enabled;
-    filtro.disabled       = !enabled;
-    btnRegistrar.disabled = !enabled;
-    if(!enabled){
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:14px">Selecciona Ingeniero…</td></tr>`;
-    }
-  }
-
-  selIngeniero.addEventListener("change", ()=>{ updateControls(); clearTable("Elige una cuadrilla…"); });
-  selCuadrilla.addEventListener("change", ()=>{ filtro.value=""; paintTable(); });
-  filtro.addEventListener("input", paintTable);
-
-  function clearTable(msg){
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:14px">${msg}</td></tr>`;
-  }
-
-  function paintTable(){
-    statusMsg.textContent = "";
-    const ingOK = selIngeniero.value!=="";
-    const cSel  = selCuadrilla.value;
-    if(!ingOK){ clearTable("Selecciona Ingeniero."); return; }
-    if(!cSel){  clearTable("Selecciona Cuadrilla."); return; }
-
-    const q = (filtro.value||"").toLowerCase().trim();
-    const rows = materiales.filter(r=>{
-      const cu  = (r[COL.CUADRILLA]??"").toString();
-      const co  = (r[COL.CODIGO]??"").toString();
-      const no  = (r[COL.NOMBRE]??"").toString();
-      if(cu!==cSel) return false;
-      if(!q) return true;
-      return co.toLowerCase().includes(q)||no.toLowerCase().includes(q);
+    const resp = await fetch(ENDPOINT_URL, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ registros })
     });
 
-    if(rows.length===0){ clearTable("Sin materiales para esa cuadrilla."); return; }
+    const data = await resp.json().catch(()=>({ ok:false, error:"Respuesta inválida" }));
 
-    const frag = document.createDocumentFragment();
-    tbody.innerHTML = "";
-    rows.forEach(r=>{
-      const cu  = r[COL.CUADRILLA] ?? "";
-      const co  = r[COL.CODIGO] ?? "";
-      const no  = r[COL.NOMBRE] ?? "";
-      const tp  = (r[COL.TIPO] ?? "").toString().toLowerCase(); // "seriado"|"no seriado"
-      const ft  = r[COL.FIS_TEO] ?? "";
-
-      const tr  = document.createElement("tr");
-
-      tr.innerHTML = `
-        <td data-label="Incluir"><input type="checkbox" class="chk"></td>
-        <td data-label="Cuadrilla">${cu}</td>
-        <td data-label="Código"><span class="badge"># ${co}</span></td>
-        <td class="left" data-label="Nombre">${no}</td>
-        <td data-label="Físico Teórico">${ft}</td>
-        <td data-label="Ingreso">
-          <select class="modo">
-            <option value="cantidad" ${tp.includes("seri") ? "" : "selected"}>Cantidad</option>
-            <option value="serie"   ${tp.includes("seri") ? "selected" : ""}>Serie</option>
-          </select>
-        </td>
-        <td data-label="Cantidad"><input type="number" class="cant" inputmode="decimal" min="0" step="any" placeholder="0"></td>
-        <td data-label="Serie(s)"><input type="text" class="series" placeholder="Ej: ABC123,ABC124"></td>
-      `;
-      // Modo inicial según tipo
-      const modo = tr.querySelector(".modo");
-      const cant = tr.querySelector(".cant");
-      const ser  = tr.querySelector(".series");
-      setMode(modo.value, cant, ser);
-
-      modo.addEventListener("change", ()=> setMode(modo.value, cant, ser));
-      frag.appendChild(tr);
-    });
-    tbody.appendChild(frag);
-  }
-
-  function setMode(mode, qtyInput, seriesInput){
-    if(mode==="cantidad"){
-      qtyInput.disabled = false; seriesInput.disabled = true; seriesInput.value="";
-    }else{ // serie
-      qtyInput.disabled = true;  qtyInput.value=""; seriesInput.disabled = false;
-    }
-  }
-
-  // Validación y “envío”
-  btnRegistrar.addEventListener("click", ()=>{
-    statusMsg.textContent = "";
-    const rows = Array.from(tbody.querySelectorAll("tr"));
-    if(rows.length===0){ return; }
-
-    const errores = [];
-    const registros = [];
-
+    // Limpia marcas previas
     rows.forEach(tr=>{
-      const chk   = tr.querySelector(".chk");
-      if(!chk || !chk.checked) return;
-
-      const cuadr = tr.children[1]?.innerText?.trim();
-      const cod   = tr.children[2]?.innerText?.replace("#","").trim();
-      const nom   = tr.children[3]?.innerText?.trim();
-      const modo  = tr.querySelector(".modo").value;
-      const cant  = tr.querySelector(".cant");
-      const ser   = tr.querySelector(".series");
-
-      // Limpia estilos previos
-      cant.classList.remove("errorCell");
-      ser.classList.remove("errorCell");
-
-      if(modo==="cantidad"){
-        const val = parseFloat(cant.value);
-        if(!(val>0)){ cant.classList.add("errorCell"); errores.push(`Cantidad faltante para ${cod} – ${nom}`); return; }
-        registros.push({cuadrilla:cuadr, codigo:cod, nombre:nom, tipo:"cantidad", cantidad:val, series:""});
-      }else{
-        const val = (ser.value||"").trim();
-        if(!val){ ser.classList.add("errorCell"); errores.push(`Serie(s) faltante(s) para ${cod} – ${nom}`); return; }
-        registros.push({cuadrilla:cuadr, codigo:cod, nombre:nom, tipo:"serie", cantidad:"", series:val});
-      }
+      tr.querySelector(".cant")?.classList.remove("errorCell");
+      tr.querySelector(".series")?.classList.remove("errorCell");
     });
 
-    if(errores.length){
-      statusMsg.className="msg error";
-      statusMsg.textContent = `Revisa: ${errores.join(" • ")}`;
-      return;
-    }
-    if(registros.length===0){
-      statusMsg.className="msg error";
-      statusMsg.textContent = "No marcaste ninguna fila para registrar.";
+    if(!resp.ok || data.ok === false){
+      // Marca errores por fila según "index"
+      if(Array.isArray(data.errors) && data.errors.length){
+        let firstBad = null;
+        data.errors.forEach(e=>{
+          const domIndex = filaIndexMap[e.index]; // índice del <tr> en el DOM
+          const tr = rows[domIndex];
+          if(!tr) return;
+          const cant = tr.querySelector(".cant");
+          const ser  = tr.querySelector(".series");
+          if(e.errors?.cantidad){ cant?.classList.add("errorCell"); firstBad = firstBad ?? cant; }
+          if(e.errors?.serie){ ser?.classList.add("errorCell"); firstBad = firstBad ?? ser; }
+          if(e.errors?.cuadrilla || e.errors?.codigo || e.errors?.reviso){
+            tr.classList.add("errorCell"); firstBad = firstBad ?? tr;
+          }
+        });
+        if(firstBad && firstBad.scrollIntoView){ firstBad.scrollIntoView({behavior:"smooth", block:"center"}); }
+        statusMsg.className="msg error";
+        const resumen = data.errors.map(e=>`#${e.index+1}: ${Object.keys(e.errors).join(", ")}`).join(" • ");
+        statusMsg.textContent = `El servidor rechazó algunos registros: ${resumen}`;
+      }else{
+        statusMsg.className="msg error";
+        statusMsg.textContent = `Error del servidor${data.error?`: ${data.error}`:""}.`;
+      }
       return;
     }
 
-    // Aquí iría el envío real (Apps Script / API). Por ahora solo confirmamos.
-    console.log("Listo para enviar:", registros);
+    // Éxito
     statusMsg.className="msg ok";
-    statusMsg.textContent = `Listo: ${registros.length} registro(s) válido(s).`;
-  });
+    statusMsg.textContent = `Registrado correctamente: ${data.saved ?? registros.length} fila(s).`;
+    bar.style.width = "0%"; progTxt.textContent = "0/0";
+    // Desmarcar seleccionados y limpiar campos
+    rows.forEach(tr=>{
+      const chk = tr.querySelector(".chk");
+      if(chk && chk.checked){
+        chk.checked = false;
+        tr.querySelector(".cant")?.value = "";
+        tr.querySelector(".series")?.value = "";
+      }
+    });
+    // ya no avisamos al salir
+    hasUnsaved = false;
+
+  }catch(e){
+    console.error(e);
+    statusMsg.className="msg error";
+    statusMsg.textContent = "Error de red al registrar.";
+  }finally{
+    btnRegistrar.disabled = false;
+    updateProgress();
+  }
+});
+
 </script>
 </body>
 </html>
-
-  <script>
-  /* ========= CONFIG ========= */
-  const SHEET_ID  = "1dtIWNjOyysVWy9Z0aIkygfwn2h6ihFXAp1nnZaQ8JXY";
-  const API_KEY   = "AIzaSyAnPJKpsn34tTYdiKK0aiRW78r3NhQOx9s";
-
-  // Nombres de pestañas en tu Google Sheet
-  const ING_SHEET        = "Ingenieros";   // B2:B = Supervisor
-  const CUADRILLAS_SHEET = "cuadrillas";   // A2:A = lista de cuadrillas
-  const MATERIALS_SHEET  = "base";         // A:H = datos; usamos A,B,C y H
-
-  // Índices de columnas en la pestaña "base"
-  const COL = { CUADRILLA:0, CODIGO:1, NOMBRE:2, FIS_TEO:7 };
-
-  /* ========= ELEMENTOS ========= */
-  const selIngeniero = document.getElementById("selIngeniero");
-  const selCuadrilla = document.getElementById("selCuadrilla");
-  const filtro       = document.getElementById("filtro");
-  const tbody        = document.querySelector("#materialTable tbody");
-
-  let materiales = [];   // matriz completa desde "base"
-  let cuadrillas = [];   // lista desde pestaña "cuadrillas"
-
-  /* ========= ARRANQUE ========= */
-  document.addEventListener("DOMContentLoaded", async () => {
-    await cargarIngenieros();
-    await cargarCuadrillas();     // ⬅️ ahora tomamos la lista de esta pestaña
-    await prefetchMateriales();
-    habilitarControles();
-    clearTable("Elige una cuadrilla…");
-  });
-
-  /* ========= HELPERS SHEETS ========= */
-  async function fetchSheetRange(rangeA1){
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(rangeA1)}?key=${API_KEY}`;
-    const res = await fetch(url);
-    if(!res.ok) throw new Error("HTTP "+res.status+" al leer "+rangeA1);
-    const data = await res.json();
-    return data.values || [];
-  }
-
-  async function cargarIngenieros(){
-    try{
-      selIngeniero.innerHTML = `<option value="">Cargando…</option>`;
-      const values = await fetchSheetRange(`${ING_SHEET}!B2:B`);
-      selIngeniero.innerHTML = `<option value="">— Selecciona —</option>`;
-      values.forEach(r=>{
-        const nombre = r?.[0]?.trim();
-        if(nombre){
-          const opt = document.createElement("option");
-          opt.value = nombre; opt.textContent = nombre;
-          selIngeniero.appendChild(opt);
-        }
-      });
-    }catch(e){
-      console.error(e);
-      selIngeniero.innerHTML = `<option value="">(Error al cargar)</option>`;
-    }
-  }
-
-  async function cargarCuadrillas(){
-    try{
-      selCuadrilla.innerHTML = `<option value="">Cargando…</option>`;
-      const values = await fetchSheetRange(`${CUADRILLAS_SHEET}!A2:A`);
-      cuadrillas = values.map(r=>r?.[0]).filter(Boolean).map(s=>s.toString().trim());
-      cuadrillas.sort((a,b)=>a.localeCompare(b,'es'));
-      renderCuadrillas();
-    }catch(e){
-      console.error("Error cargando cuadrillas:", e);
-      selCuadrilla.innerHTML = `<option value="">(Error al cargar)</option>`;
-    }
-  }
-
-  async function prefetchMateriales(){
-    try{
-      const values = await fetchSheetRange(`${MATERIALS_SHEET}!A:H`);
-      materiales = values.slice(1); // quita encabezado
-    }catch(e){
-      console.error("Error cargando materiales:", e);
-      materiales = [];
-    }
-  }
-
-  /* ========= UI ========= */
-  function renderCuadrillas(){
-    selCuadrilla.innerHTML = `<option value="">— Selecciona —</option>`;
-    cuadrillas.forEach(c=>{
-      const opt = document.createElement("option");
-      opt.value = c; opt.textContent = c;
-      selCuadrilla.appendChild(opt);
-    });
-  }
-
-  function habilitarControles(){
-    const enabled = selIngeniero.value !== "";
-    selCuadrilla.disabled = !enabled;
-    filtro.disabled       = !enabled;
-  }
-
-  function clearTable(msg){
-    tbody.innerHTML = `<tr><td class="loading" colspan="5">${msg}</td></tr>`;
-  }
-
-  function pintarTabla(){
-    const ingOk = selIngeniero.value !== "";
-    const cSel  = selCuadrilla.value;
-
-    if(!ingOk){ clearTable("Selecciona un ingeniero."); return; }
-    if(!cSel){  clearTable("Selecciona una cuadrilla."); return; }
-
-    const q = (filtro.value || "").toLowerCase().trim();
-
-    const rows = materiales.filter(row=>{
-      const cuad   = (row[COL.CUADRILLA] ?? "").toString();
-      const codigo = (row[COL.CODIGO] ?? "").toString();
-      const nombre = (row[COL.NOMBRE] ?? "").toString();
-      if(cuad !== cSel) return false;
-      if(!q) return true;
-      return codigo.toLowerCase().includes(q) || nombre.toLowerCase().includes(q);
-    });
-
-    if(rows.length === 0){ clearTable("Sin materiales para esa cuadrilla."); return; }
-
-    const fr = document.createDocumentFragment();
-    tbody.innerHTML = "";
-    rows.forEach(r=>{
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${r[COL.CUADRILLA] ?? ""}</td>
-        <td><span class="badge"># ${r[COL.CODIGO] ?? ""}</span></td>
-        <td class="col-name" style="text-align:left;padding-left:12px;">${r[COL.NOMBRE] ?? ""}</td>
-        <td>${r[COL.FIS_TEO] ?? ""}</td>
-        <td><input type="number" inputmode="decimal" placeholder="0" min="0" step="any"></td>
-      `;
-      fr.appendChild(tr);
-    });
-    tbody.appendChild(fr);
-  }
-
-  /* ========= EVENTOS ========= */
-  selIngeniero.addEventListener("change", ()=>{
-    habilitarControles();
-    clearTable("Elige una cuadrilla…");
-  });
-
-  selCuadrilla.addEventListener("change", ()=>{
-    filtro.value = "";
-    pintarTabla();
-  });
-
-  filtro.addEventListener("input", pintarTabla);
-</script>
-
