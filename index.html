@@ -62,3 +62,41 @@
   </script>
 </body>
 </html>
+<script>
+  // ✅ TUS CREDENCIALES (deja las que ya tienes)
+  const SHEET_ID  = "1dtIWNjOyysVWy9Z0aIkygfwn2h6ihFXAp1nnZaQ8JXY";
+  const API_KEY   = "AIzaSyAnPJKpsn34tTYdiKK0aiRW78r3NhQOx9s";
+
+  // Pestaña con la lista de ingenieros
+  const ING_SHEET = "Ingenieros";
+
+  // Carga la lista de ingenieros desde Ingenieros!B2:B (columna “Supervisor”)
+  async function cargarIngenieros() {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(ING_SHEET + "!B2:B")}?key=${API_KEY}`;
+    const sel = document.getElementById("selIngeniero");
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      const values = data.values || [];
+
+      // Limpia y rellena
+      sel.innerHTML = `<option value="">— Selecciona —</option>`;
+      values.forEach(row => {
+        const nombre = (row && row[0]) ? row[0] : "";
+        if (nombre) {
+          const opt = document.createElement("option");
+          opt.value = nombre;
+          opt.textContent = nombre;
+          sel.appendChild(opt);
+        }
+      });
+    } catch (e) {
+      console.error("Error cargando ingenieros:", e);
+      sel.innerHTML = `<option value="">(Error al cargar)</option>`;
+    }
+  }
+
+  // Llamar al cargar la página
+  document.addEventListener("DOMContentLoaded", cargarIngenieros);
+</script>
