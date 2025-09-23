@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Control de Materiales</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background: #f4f4f4; }
+    input { width: 100px; text-align: right; }
+    .notice { background:#fff8e1; border:1px solid #ffecb3; padding:10px; border-radius:6px; }
+  </style>
+</head>
+<body>
+  <h1>Control de Materiales</h1>
+  <p class="notice">
+    En el siguiente paso configuraremos Google Sheets. Por ahora esto es un esqueleto funcional.
+  </p>
+
+  <table id="materialTable">
+    <thead>
+      <tr>
+        <th>Cuadrilla</th>
+        <th>Material</th>
+        <th>Cantidad Teórica</th>
+        <th>Cantidad Física (Ingresar)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Se llenará con datos del Sheet en el siguiente paso -->
+    </tbody>
+  </table>
+
+  <script>
+    // TODO: En el próximo paso añadiremos la conexión real a Google Sheets.
+    // Por ahora, cargamos unos datos de ejemplo para verificar que la página funciona.
+    const datosEjemplo = [
+      ["Cuadrilla A", "Cemento", 120],
+      ["Cuadrilla B", "Arena", 80],
+      ["Cuadrilla C", "Grava", 60],
+    ];
+
+    const tbody = document.querySelector("#materialTable tbody");
+    datosEjemplo.forEach(([cuadrilla, material, teorico]) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${cuadrilla}</td>
+        <td>${material}</td>
+        <td>${teorico}</td>
+        <td><input type="number" placeholder="0" min="0" step="any"></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  </script>
+</body>
+</html>
