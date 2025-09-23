@@ -1,150 +1,337 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Control de Materiales</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Control de Materiales</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#0b1221; --text:#e5e7eb; --muted:#94a3b8;
+    --border:#1f2937; --accent:#38bdf8; --danger:#ef4444; --ok:#10b981;
+    --radius:16px; --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{margin:0; font-family:system-ui,Segoe UI,Roboto,Arial; color:var(--text);
+       background: radial-gradient(1200px 600px at 10% -10%, #11203f 0%, transparent 60%),
+                   radial-gradient(1000px 500px at 110% 10%, #12243f 0%, transparent 60%),
+                   var(--bg);
+       padding:20px}
+  .app{max-width:1200px;margin:0 auto}
+  h1{margin:0 0 14px;font-size:clamp(22px,3.2vw,32px)}
+  .panel{background:linear-gradient(180deg,#0f1a2e,#0b1221); border:1px solid var(--border);
+         border-radius:var(--radius); box-shadow:var(--shadow); padding:16px}
+  .controls{display:grid; gap:12px}
+  @media (min-width:760px){ .controls{ grid-template-columns: 1.1fr 1.1fr 1fr; align-items:end } }
+  label{display:block; font-size:14px; color:var(--muted); margin-bottom:6px}
+  select,input[type="text"],input[type="number"]{
+    width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--border);
+    background:#0a1220; color:var(--text); outline:none;
+  }
+  select:focus,input:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(56,189,248,.18) }
+  .hint{color:var(--muted); font-size:12px; margin-top:6px}
+  .actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:12px}
+  button{
+    border:1px solid var(--border); background:#0d1b31; color:var(--text);
+    padding:10px 14px; border-radius:12px; cursor:pointer;
+  }
+  button.primary{background:linear-gradient(90deg,#22d3ee,#38bdf8); color:#081320; font-weight:600}
+  button:disabled{opacity:.6; cursor:not-allowed}
 
-  <style>
-    :root{
-      --bg:#0f172a;            /* slate-900 */
-      --panel:#111827;         /* gray-900 */
-      --card:#0b1221;          /* deep card */
-      --muted:#94a3b8;         /* slate-400 */
-      --text:#e5e7eb;          /* gray-200 */
-      --accent:#22d3ee;        /* cyan-400 */
-      --accent-2:#38bdf8;      /* sky-400 */
-      --ok:#10b981;            /* emerald-500 */
-      --warn:#f59e0b;          /* amber-500 */
-      --danger:#ef4444;        /* red-500 */
-      --border:#1f2937;        /* gray-800 */
-      --shadow: 0 10px 30px rgba(0,0,0,.35);
-      --radius:16px;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0; font-family: ui-sans-serif,system-ui,Segoe UI,Roboto,Arial;
-      background: radial-gradient(1200px 600px at 10% -10%, #11203f 0%, transparent 60%),
-                  radial-gradient(1000px 500px at 110% 10%, #12243f 0%, transparent 60%),
-                  var(--bg);
-      color:var(--text);
-      padding:24px;
-    }
+  /* Tabla */
+  .table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch; margin-top:16px;
+              border:1px solid var(--border); border-radius:14px}
+  table{width:100%; border-collapse:separate; border-spacing:0; min-width:900px}
+  thead th{position:sticky; top:0; z-index:2; background:#0e213a; color:#cfe7ff; padding:10px;
+           border-bottom:1px solid var(--border)}
+  tbody td{padding:8px; border-bottom:1px solid var(--border); text-align:center}
+  tbody tr:hover{background:rgba(56,189,248,.08)}
+  .left{text-align:left}
+  .badge{display:inline-block; padding:4px 8px; border:1px solid var(--border);
+         border-radius:999px; background:#0a1323; color:#cbd5e1; font-size:12px}
 
-    .app{
-      max-width:1200px; margin:0 auto;
-    }
+  /* Móvil: filas como tarjetas con etiquetas */
+  @media (max-width:640px){
+    table{min-width:0}
+    thead{display:none}
+    tbody tr{display:block; padding:12px; border-bottom:1px solid var(--border)}
+    tbody td{display:flex; justify-content:space-between; gap:10px; border:0; padding:8px 0}
+    tbody td::before{content:attr(data-label); color:var(--muted); text-align:left}
+    .table-wrap{border-radius:12px}
+  }
 
-    .title{
-      font-size: clamp(22px, 3.2vw, 32px);
-      display:flex; align-items:center; gap:12px; margin:0 0 14px 0;
-    }
-    .title .dot{
-      width:10px; height:10px; border-radius:999px; background:linear-gradient(90deg,var(--accent),var(--accent-2));
-      box-shadow: 0 0 20px var(--accent);
-    }
-    .panel{
-      background:linear-gradient(180deg,#0e1729 0%, #0b1221 100%);
-      border:1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding:16px;
-    }
-
-    .controls{
-      display:grid;
-      grid-template-columns: 1fr;
-      gap:12px;
-    }
-    @media (min-width:700px){
-      .controls{ grid-template-columns: 1.3fr 1.3fr 1fr; align-items:end; }
-    }
-
-    label{font-size:14px; color:var(--muted); margin-bottom:6px; display:block;}
-    select, input[type="number"], input[type="text"]{
-      width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--border);
-      background:#0a1220; color:var(--text); outline:none;
-      transition: border-color .2s, box-shadow .2s;
-    }
-    select:focus, input:focus{ border-color:var(--accent-2); box-shadow:0 0 0 3px rgba(34,211,238,.15); }
-
-    .hint{ color:var(--muted); font-size:13px; margin-top:6px; }
-
-    .table-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; margin-top:18px; border-radius:14px; border:1px solid var(--border); }
-    table{ width:100%; border-collapse:separate; border-spacing:0; min-width:760px; }
-    thead th{
-      position:sticky; top:0; z-index:2;
-      background:linear-gradient(180deg,#0e213a,#0c1a2d);
-      color:#bfe9ff; text-align:center; font-weight:600; letter-spacing:.2px;
-      padding:12px; border-bottom:1px solid var(--border);
-    }
-    tbody td{ padding:10px 8px; text-align:center; border-bottom:1px solid var(--border); }
-    tbody tr:hover{ background:rgba(56,189,248,.08); }
-    .col-name{ text-align:left; }
-
-    .badge{
-      display:inline-flex; gap:6px; align-items:center;
-      border:1px solid var(--border); padding:6px 10px; border-radius:999px;
-      background:#0a1323; color:#cbd5e1; font-size:12px;
-    }
-    .loading{ color:var(--muted); padding:16px; text-align:center; }
-    .error{ color:var(--danger); padding:16px; text-align:center; }
-
-    .footer-note{
-      margin-top:14px; font-size:12px; color:var(--muted);
-    }
-  </style>
+  .errorCell{outline:2px solid var(--danger); outline-offset:2px; border-radius:8px}
+  .msg{margin-top:10px; font-size:14px}
+  .msg.error{color:var(--danger)}
+  .msg.ok{color:var(--ok)}
+</style>
 </head>
 <body>
-  <div class="app">
-    <h1 class="title"><span class="dot"></span>Control de Materiales</h1>
+<div class="app">
+  <h1>Control de Materiales</h1>
 
-    <div class="panel">
-      <div class="controls">
-        <div>
-          <label for="selIngeniero">Ingeniero que revisa</label>
-          <select id="selIngeniero">
-            <option value="">— Selecciona —</option>
-          </select>
-          <div class="hint">Fuente: pestaña <strong>Ingenieros</strong> (columna “Supervisor”)</div>
-        </div>
-
-        <div>
-          <label for="selCuadrilla">Cuadrilla</label>
-          <select id="selCuadrilla" disabled>
-            <option value="">— Selecciona —</option>
-          </select>
-          <div class="hint">Se habilita al seleccionar Ingeniero</div>
-        </div>
-
-        <div>
-          <label for="filtro">Filtrar material</label>
-          <input id="filtro" type="text" placeholder="Buscar por código o nombre…" disabled />
-        </div>
+  <div class="panel">
+    <div class="controls">
+      <div>
+        <label for="selIngeniero">Ingeniero que revisa</label>
+        <select id="selIngeniero"><option value="">— Selecciona —</option></select>
+        <div class="hint">Fuente: pestaña <b>Ingenieros</b> (columna B)</div>
       </div>
 
-      <div class="table-wrap" id="tablaWrap">
-        <table id="materialTable" aria-describedby="tabla-descr">
-          <thead>
-            <tr>
-              <th>Cuadrilla</th>
-              <th>Código Material</th>
-              <th style="text-align:left;padding-left:12px;">Nombre Material</th>
-              <th>Físico Teórico</th>
-              <th>Físico Real (Ingresar)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td class="loading" colspan="5">Selecciona Ingeniero y Cuadrilla…</td></tr>
-          </tbody>
-        </table>
+      <div>
+        <label for="selCuadrilla">Cuadrilla</label>
+        <select id="selCuadrilla" disabled><option value="">— Selecciona —</option></select>
+        <div class="hint">Lista desde pestaña <b>cuadrillas</b> (columna A)</div>
       </div>
-      <div id="tabla-descr" class="footer-note">Desliza horizontalmente en móvil si es necesario.</div>
+
+      <div>
+        <label for="filtro">Filtrar material</label>
+        <input id="filtro" type="text" placeholder="Buscar por código o nombre…" disabled />
+      </div>
     </div>
 
-    <p class="footer-note">Tip: puedes marcar tu página como app en el móvil (Añadir a pantalla de inicio) para usarla a pantalla completa.</p>
+    <div class="actions">
+      <button id="btnRegistrar" class="primary" disabled>Registrar seleccionados</button>
+      <span id="status" class="msg"></span>
+    </div>
+
+    <div class="table-wrap">
+      <table id="materialTable">
+        <thead>
+          <tr>
+            <th>✔</th>
+            <th>Cuadrilla</th>
+            <th>Código</th>
+            <th class="left">Nombre Material</th>
+            <th>Físico Teórico</th>
+            <th>Ingreso</th>
+            <th>Cantidad</th>
+            <th>Serie(s)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:14px">Selecciona Ingeniero y Cuadrilla…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="hint">En móvil, cada fila se muestra como tarjeta con etiquetas.</div>
   </div>
+</div>
+
+<script>
+  /* ===== CONFIG ===== */
+  const SHEET_ID  = "1dtIWNjOyysVWy9Z0aIkygfwn2h6ihFXAp1nnZaQ8JXY";
+  const API_KEY   = "AIzaSyAnPJKpsn34tTYdiKK0aiRW78r3NhQOx9s";
+
+  // Pestañas
+  const ING_SHEET        = "Ingenieros"; // B2:B = nombres
+  const CUADRILLAS_SHEET = "cuadrillas"; // A2:A = cuadrillas
+  const MATERIALS_SHEET  = "base";       // A:I (min)
+
+  // Índices en "base" (0-index)
+  const COL = { CUADRILLA:0, CODIGO:1, NOMBRE:2, TIPO:3, FIS_TEO:8 }; // Físico Teórico en I
+
+  /* ===== ELEMENTOS ===== */
+  const selIngeniero = document.getElementById("selIngeniero");
+  const selCuadrilla = document.getElementById("selCuadrilla");
+  const filtro       = document.getElementById("filtro");
+  const tbody        = document.querySelector("#materialTable tbody");
+  const btnRegistrar = document.getElementById("btnRegistrar");
+  const statusMsg    = document.getElementById("status");
+
+  let materiales = []; // todos
+  let cuadrillas = [];
+
+  /* ===== INIT ===== */
+  document.addEventListener("DOMContentLoaded", async () => {
+    await loadIngenieros();
+    await loadCuadrillas();
+    await loadMateriales();
+    updateControls();
+  });
+
+  async function gFetch(rangeA1){
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(rangeA1)}?key=${API_KEY}`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error(`HTTP ${res.status} al leer ${rangeA1}`);
+    const data = await res.json();
+    return data.values || [];
+  }
+
+  async function loadIngenieros(){
+    try{
+      selIngeniero.innerHTML = `<option value="">Cargando…</option>`;
+      const v = await gFetch(`${ING_SHEET}!B2:B`);
+      selIngeniero.innerHTML = `<option value="">— Selecciona —</option>`;
+      v.forEach(r=>{
+        const name = r?.[0]?.trim();
+        if(name){
+          const opt=document.createElement("option");
+          opt.value=name; opt.textContent=name;
+          selIngeniero.appendChild(opt);
+        }
+      });
+    }catch(e){ selIngeniero.innerHTML=`<option value="">(Error al cargar)</option>`; console.error(e); }
+  }
+
+  async function loadCuadrillas(){
+    try{
+      selCuadrilla.innerHTML = `<option value="">Cargando…</option>`;
+      const v = await gFetch(`${CUADRILLAS_SHEET}!A2:A`);
+      cuadrillas = v.map(r=>r?.[0]).filter(Boolean).map(s=>s.toString().trim());
+      cuadrillas.sort((a,b)=>a.localeCompare(b,'es'));
+      selCuadrilla.innerHTML = `<option value="">— Selecciona —</option>`;
+      cuadrillas.forEach(c=>{
+        const opt=document.createElement("option");
+        opt.value=c; opt.textContent=c;
+        selCuadrilla.appendChild(opt);
+      });
+    }catch(e){ selCuadrilla.innerHTML=`<option value="">(Error al cargar)</option>`; console.error(e); }
+  }
+
+  async function loadMateriales(){
+    try{
+      const v = await gFetch(`${MATERIALS_SHEET}!A:I`);
+      materiales = v.slice(1); // sin encabezado
+    }catch(e){ console.error("Materiales:", e); materiales=[]; }
+  }
+
+  function updateControls(){
+    const enabled = selIngeniero.value !== "";
+    selCuadrilla.disabled = !enabled;
+    filtro.disabled       = !enabled;
+    btnRegistrar.disabled = !enabled;
+    if(!enabled){
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:14px">Selecciona Ingeniero…</td></tr>`;
+    }
+  }
+
+  selIngeniero.addEventListener("change", ()=>{ updateControls(); clearTable("Elige una cuadrilla…"); });
+  selCuadrilla.addEventListener("change", ()=>{ filtro.value=""; paintTable(); });
+  filtro.addEventListener("input", paintTable);
+
+  function clearTable(msg){
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:14px">${msg}</td></tr>`;
+  }
+
+  function paintTable(){
+    statusMsg.textContent = "";
+    const ingOK = selIngeniero.value!=="";
+    const cSel  = selCuadrilla.value;
+    if(!ingOK){ clearTable("Selecciona Ingeniero."); return; }
+    if(!cSel){  clearTable("Selecciona Cuadrilla."); return; }
+
+    const q = (filtro.value||"").toLowerCase().trim();
+    const rows = materiales.filter(r=>{
+      const cu  = (r[COL.CUADRILLA]??"").toString();
+      const co  = (r[COL.CODIGO]??"").toString();
+      const no  = (r[COL.NOMBRE]??"").toString();
+      if(cu!==cSel) return false;
+      if(!q) return true;
+      return co.toLowerCase().includes(q)||no.toLowerCase().includes(q);
+    });
+
+    if(rows.length===0){ clearTable("Sin materiales para esa cuadrilla."); return; }
+
+    const frag = document.createDocumentFragment();
+    tbody.innerHTML = "";
+    rows.forEach(r=>{
+      const cu  = r[COL.CUADRILLA] ?? "";
+      const co  = r[COL.CODIGO] ?? "";
+      const no  = r[COL.NOMBRE] ?? "";
+      const tp  = (r[COL.TIPO] ?? "").toString().toLowerCase(); // "seriado"|"no seriado"
+      const ft  = r[COL.FIS_TEO] ?? "";
+
+      const tr  = document.createElement("tr");
+
+      tr.innerHTML = `
+        <td data-label="Incluir"><input type="checkbox" class="chk"></td>
+        <td data-label="Cuadrilla">${cu}</td>
+        <td data-label="Código"><span class="badge"># ${co}</span></td>
+        <td class="left" data-label="Nombre">${no}</td>
+        <td data-label="Físico Teórico">${ft}</td>
+        <td data-label="Ingreso">
+          <select class="modo">
+            <option value="cantidad" ${tp.includes("seri") ? "" : "selected"}>Cantidad</option>
+            <option value="serie"   ${tp.includes("seri") ? "selected" : ""}>Serie</option>
+          </select>
+        </td>
+        <td data-label="Cantidad"><input type="number" class="cant" inputmode="decimal" min="0" step="any" placeholder="0"></td>
+        <td data-label="Serie(s)"><input type="text" class="series" placeholder="Ej: ABC123,ABC124"></td>
+      `;
+      // Modo inicial según tipo
+      const modo = tr.querySelector(".modo");
+      const cant = tr.querySelector(".cant");
+      const ser  = tr.querySelector(".series");
+      setMode(modo.value, cant, ser);
+
+      modo.addEventListener("change", ()=> setMode(modo.value, cant, ser));
+      frag.appendChild(tr);
+    });
+    tbody.appendChild(frag);
+  }
+
+  function setMode(mode, qtyInput, seriesInput){
+    if(mode==="cantidad"){
+      qtyInput.disabled = false; seriesInput.disabled = true; seriesInput.value="";
+    }else{ // serie
+      qtyInput.disabled = true;  qtyInput.value=""; seriesInput.disabled = false;
+    }
+  }
+
+  // Validación y “envío”
+  btnRegistrar.addEventListener("click", ()=>{
+    statusMsg.textContent = "";
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+    if(rows.length===0){ return; }
+
+    const errores = [];
+    const registros = [];
+
+    rows.forEach(tr=>{
+      const chk   = tr.querySelector(".chk");
+      if(!chk || !chk.checked) return;
+
+      const cuadr = tr.children[1]?.innerText?.trim();
+      const cod   = tr.children[2]?.innerText?.replace("#","").trim();
+      const nom   = tr.children[3]?.innerText?.trim();
+      const modo  = tr.querySelector(".modo").value;
+      const cant  = tr.querySelector(".cant");
+      const ser   = tr.querySelector(".series");
+
+      // Limpia estilos previos
+      cant.classList.remove("errorCell");
+      ser.classList.remove("errorCell");
+
+      if(modo==="cantidad"){
+        const val = parseFloat(cant.value);
+        if(!(val>0)){ cant.classList.add("errorCell"); errores.push(`Cantidad faltante para ${cod} – ${nom}`); return; }
+        registros.push({cuadrilla:cuadr, codigo:cod, nombre:nom, tipo:"cantidad", cantidad:val, series:""});
+      }else{
+        const val = (ser.value||"").trim();
+        if(!val){ ser.classList.add("errorCell"); errores.push(`Serie(s) faltante(s) para ${cod} – ${nom}`); return; }
+        registros.push({cuadrilla:cuadr, codigo:cod, nombre:nom, tipo:"serie", cantidad:"", series:val});
+      }
+    });
+
+    if(errores.length){
+      statusMsg.className="msg error";
+      statusMsg.textContent = `Revisa: ${errores.join(" • ")}`;
+      return;
+    }
+    if(registros.length===0){
+      statusMsg.className="msg error";
+      statusMsg.textContent = "No marcaste ninguna fila para registrar.";
+      return;
+    }
+
+    // Aquí iría el envío real (Apps Script / API). Por ahora solo confirmamos.
+    console.log("Listo para enviar:", registros);
+    statusMsg.className="msg ok";
+    statusMsg.textContent = `Listo: ${registros.length} registro(s) válido(s).`;
+  });
+</script>
+</body>
+</html>
 
   <script>
   /* ========= CONFIG ========= */
