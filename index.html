@@ -147,159 +147,154 @@
   </div>
 
   <script>
-    /* ========= CONFIG ========= */
-    const SHEET_ID  = "1dtIWNjOyysVWy9Z0aIkygfwn2h6ihFXAp1nnZaQ8JXY";
-    const API_KEY   = "AIzaSyAnPJKpsn34tTYdiKK0aiRW78r3NhQOx9s";
+  /* ========= CONFIG ========= */
+  const SHEET_ID  = "1dtIWNjOyysVWy9Z0aIkygfwn2h6ihFXAp1nnZaQ8JXY";
+  const API_KEY   = "AIzaSyAnPJKpsn34tTYdiKK0aiRW78r3NhQOx9s";
 
-    // Nombres de pestañas en el Google Sheet
-    const ING_SHEET       = "Ingenieros";   // Columna B: "Supervisor" (B2:B)
-    const MATERIALS_SHEET = "base";         // Columnas: A Cuadrilla, B Código, C Nombre, H Físico Teórico
+  // Nombres de pestañas en tu Google Sheet
+  const ING_SHEET        = "Ingenieros";   // B2:B = Supervisor
+  const CUADRILLAS_SHEET = "cuadrillas";   // A2:A = lista de cuadrillas
+  const MATERIALS_SHEET  = "base";         // A:H = datos; usamos A,B,C y H
 
-    // Índices de columnas en la pestaña de materiales (base)
-    const COL = { CUADRILLA:0, CODIGO:1, NOMBRE:2, FIS_TEO:7 };
+  // Índices de columnas en la pestaña "base"
+  const COL = { CUADRILLA:0, CODIGO:1, NOMBRE:2, FIS_TEO:7 };
 
-    /* ========= ELEMENTOS ========= */
-    const selIngeniero = document.getElementById("selIngeniero");
-    const selCuadrilla = document.getElementById("selCuadrilla");
-    const filtro       = document.getElementById("filtro");
-    const tbody        = document.querySelector("#materialTable tbody");
+  /* ========= ELEMENTOS ========= */
+  const selIngeniero = document.getElementById("selIngeniero");
+  const selCuadrilla = document.getElementById("selCuadrilla");
+  const filtro       = document.getElementById("filtro");
+  const tbody        = document.querySelector("#materialTable tbody");
 
-    let materiales = [];      // matriz completa desde Sheets
-    let cuadrillas = [];      // lista única de cuadrillas
+  let materiales = [];   // matriz completa desde "base"
+  let cuadrillas = [];   // lista desde pestaña "cuadrillas"
 
-    /* ========= CARGA INICIAL ========= */
-    document.addEventListener("DOMContentLoaded", async () => {
-      await cargarIngenieros();
-      await prefetchMateriales();   // traemos materiales una sola vez
-      prepararCuadrillas();         // pero no habilitamos hasta elegir ingeniero
-    });
+  /* ========= ARRANQUE ========= */
+  document.addEventListener("DOMContentLoaded", async () => {
+    await cargarIngenieros();
+    await cargarCuadrillas();     // ⬅️ ahora tomamos la lista de esta pestaña
+    await prefetchMateriales();
+    habilitarControles();
+    clearTable("Elige una cuadrilla…");
+  });
 
-    /* ========= GOOGLE SHEETS HELPERS ========= */
-    async function fetchSheetRange(rangeA1){
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(rangeA1)}?key=${API_KEY}`;
-      const res = await fetch(url);
-      if(!res.ok) throw new Error("Error HTTP "+res.status);
-      const data = await res.json();
-      return data.values || [];
-    }
+  /* ========= HELPERS SHEETS ========= */
+  async function fetchSheetRange(rangeA1){
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(rangeA1)}?key=${API_KEY}`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("HTTP "+res.status+" al leer "+rangeA1);
+    const data = await res.json();
+    return data.values || [];
+  }
 
-    async function cargarIngenieros(){
-      try{
-        selIngeniero.innerHTML = `<option value="">Cargando…</option>`;
-        const values = await fetchSheetRange(`${ING_SHEET}!B2:B`);
-        selIngeniero.innerHTML = `<option value="">— Selecciona —</option>`;
-        values.forEach(row=>{
-          const nombre = (row && row[0]) ? row[0].trim() : "";
-          if(nombre){
-            const opt = document.createElement("option");
-            opt.value = nombre; opt.textContent = nombre;
-            selIngeniero.appendChild(opt);
-          }
-        });
-      }catch(e){
-        console.error(e);
-        selIngeniero.innerHTML = `<option value="">(Error al cargar)</option>`;
-      }
-    }
-
-    async function prefetchMateriales(){
-      try{
-        const values = await fetchSheetRange(`${MATERIALS_SHEET}!A:H`);
-        // Quita encabezado
-        materiales = values.slice(1);
-      }catch(e){
-        console.error("Error cargando materiales:", e);
-        materiales = [];
-      }
-    }
-
-    function prepararCuadrillas(){
-      const set = new Set();
-      materiales.forEach(row=>{
-        const cuad = (row[COL.CUADRILLA] ?? "").toString().trim();
-        if(cuad) set.add(cuad);
+  async function cargarIngenieros(){
+    try{
+      selIngeniero.innerHTML = `<option value="">Cargando…</option>`;
+      const values = await fetchSheetRange(`${ING_SHEET}!B2:B`);
+      selIngeniero.innerHTML = `<option value="">— Selecciona —</option>`;
+      values.forEach(r=>{
+        const nombre = r?.[0]?.trim();
+        if(nombre){
+          const opt = document.createElement("option");
+          opt.value = nombre; opt.textContent = nombre;
+          selIngeniero.appendChild(opt);
+        }
       });
-      cuadrillas = Array.from(set).sort((a,b)=>a.localeCompare(b,'es'));
+    }catch(e){
+      console.error(e);
+      selIngeniero.innerHTML = `<option value="">(Error al cargar)</option>`;
+    }
+  }
+
+  async function cargarCuadrillas(){
+    try{
+      selCuadrilla.innerHTML = `<option value="">Cargando…</option>`;
+      const values = await fetchSheetRange(`${CUADRILLAS_SHEET}!A2:A`);
+      cuadrillas = values.map(r=>r?.[0]).filter(Boolean).map(s=>s.toString().trim());
+      cuadrillas.sort((a,b)=>a.localeCompare(b,'es'));
       renderCuadrillas();
+    }catch(e){
+      console.error("Error cargando cuadrillas:", e);
+      selCuadrilla.innerHTML = `<option value="">(Error al cargar)</option>`;
     }
+  }
 
-    function renderCuadrillas(){
-      selCuadrilla.innerHTML = `<option value="">— Selecciona —</option>`;
-      cuadrillas.forEach(c=>{
-        const opt = document.createElement("option");
-        opt.value = c; opt.textContent = c;
-        selCuadrilla.appendChild(opt);
-      });
-      selCuadrilla.disabled = (selIngeniero.value === "");
-      filtro.disabled       = (selIngeniero.value === "");
+  async function prefetchMateriales(){
+    try{
+      const values = await fetchSheetRange(`${MATERIALS_SHEET}!A:H`);
+      materiales = values.slice(1); // quita encabezado
+    }catch(e){
+      console.error("Error cargando materiales:", e);
+      materiales = [];
     }
+  }
 
-    /* ========= EVENTOS ========= */
-    selIngeniero.addEventListener("change", ()=>{
-      renderCuadrillas();
-      clearTable("Elige una cuadrilla…");
-      filtro.value = "";
+  /* ========= UI ========= */
+  function renderCuadrillas(){
+    selCuadrilla.innerHTML = `<option value="">— Selecciona —</option>`;
+    cuadrillas.forEach(c=>{
+      const opt = document.createElement("option");
+      opt.value = c; opt.textContent = c;
+      selCuadrilla.appendChild(opt);
+    });
+  }
+
+  function habilitarControles(){
+    const enabled = selIngeniero.value !== "";
+    selCuadrilla.disabled = !enabled;
+    filtro.disabled       = !enabled;
+  }
+
+  function clearTable(msg){
+    tbody.innerHTML = `<tr><td class="loading" colspan="5">${msg}</td></tr>`;
+  }
+
+  function pintarTabla(){
+    const ingOk = selIngeniero.value !== "";
+    const cSel  = selCuadrilla.value;
+
+    if(!ingOk){ clearTable("Selecciona un ingeniero."); return; }
+    if(!cSel){  clearTable("Selecciona una cuadrilla."); return; }
+
+    const q = (filtro.value || "").toLowerCase().trim();
+
+    const rows = materiales.filter(row=>{
+      const cuad   = (row[COL.CUADRILLA] ?? "").toString();
+      const codigo = (row[COL.CODIGO] ?? "").toString();
+      const nombre = (row[COL.NOMBRE] ?? "").toString();
+      if(cuad !== cSel) return false;
+      if(!q) return true;
+      return codigo.toLowerCase().includes(q) || nombre.toLowerCase().includes(q);
     });
 
-    selCuadrilla.addEventListener("change", ()=>{
-      filtro.value = "";
-      pintarTabla();
+    if(rows.length === 0){ clearTable("Sin materiales para esa cuadrilla."); return; }
+
+    const fr = document.createDocumentFragment();
+    tbody.innerHTML = "";
+    rows.forEach(r=>{
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${r[COL.CUADRILLA] ?? ""}</td>
+        <td><span class="badge"># ${r[COL.CODIGO] ?? ""}</span></td>
+        <td class="col-name" style="text-align:left;padding-left:12px;">${r[COL.NOMBRE] ?? ""}</td>
+        <td>${r[COL.FIS_TEO] ?? ""}</td>
+        <td><input type="number" inputmode="decimal" placeholder="0" min="0" step="any"></td>
+      `;
+      fr.appendChild(tr);
     });
+    tbody.appendChild(fr);
+  }
 
-    filtro.addEventListener("input", ()=>{
-      pintarTabla();
-    });
+  /* ========= EVENTOS ========= */
+  selIngeniero.addEventListener("change", ()=>{
+    habilitarControles();
+    clearTable("Elige una cuadrilla…");
+  });
 
-    /* ========= RENDER TABLA ========= */
-    function clearTable(msg){
-      tbody.innerHTML = `<tr><td class="loading" colspan="5">${msg}</td></tr>`;
-    }
+  selCuadrilla.addEventListener("change", ()=>{
+    filtro.value = "";
+    pintarTabla();
+  });
 
-    function pintarTabla(){
-      const ingOk = selIngeniero.value !== "";
-      const cSel  = selCuadrilla.value;
+  filtro.addEventListener("input", pintarTabla);
+</script>
 
-      if(!ingOk){ clearTable("Selecciona un ingeniero."); return; }
-      if(!cSel){  clearTable("Selecciona una cuadrilla."); return; }
-
-      const q = (filtro.value || "").toLowerCase().trim();
-
-      const rows = materiales.filter(row=>{
-        const cuad   = (row[COL.CUADRILLA] ?? "").toString();
-        const codigo = (row[COL.CODIGO] ?? "").toString();
-        const nombre = (row[COL.NOMBRE] ?? "").toString();
-        if(cuad !== cSel) return false;
-        if(!q) return true;
-        return codigo.toLowerCase().includes(q) || nombre.toLowerCase().includes(q);
-      });
-
-      if(rows.length === 0){
-        clearTable("No hay materiales para esa cuadrilla.");
-        return;
-      }
-
-      const fr = document.createDocumentFragment();
-      tbody.innerHTML = "";
-
-      rows.forEach(r=>{
-        const cuad   = r[COL.CUADRILLA] ?? "";
-        const codigo = r[COL.CODIGO] ?? "";
-        const nombre = r[COL.NOMBRE] ?? "";
-        const fisT   = r[COL.FIS_TEO] ?? "";
-
-        const tr = document.createElement("tr");
-        const tdCuad = `<td>${cuad}</td>`;
-        const tdCod  = `<td><span class="badge"># ${codigo}</span></td>`;
-        const tdNom  = `<td class="col-name" style="text-align:left;padding-left:12px;">${nombre}</td>`;
-        const tdTeo  = `<td>${fisT}</td>`;
-        const tdReal = `<td><input type="number" inputmode="decimal" placeholder="0" min="0" step="any" aria-label="Físico real para ${nombre}"></td>`;
-
-        tr.innerHTML = tdCuad + tdCod + tdNom + tdTeo + tdReal;
-        fr.appendChild(tr);
-      });
-
-      tbody.appendChild(fr);
-    }
-  </script>
-</body>
-</html>
