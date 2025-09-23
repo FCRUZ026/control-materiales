@@ -7,7 +7,8 @@
 <style>
   :root{
     --bg:#0f172a; --panel:#0b1221; --text:#e5e7eb; --muted:#94a3b8;
-    --border:#1f2937; --accent:#38bdf8; --danger:#ef4444; --ok:#10b981;
+    --border:#1f2937; --accent:#38bdf8; --accent2:#22d3ee;
+    --danger:#ef4444; --ok:#10b981; --warn:#f59e0b;
     --radius:16px; --shadow:0 10px 30px rgba(0,0,0,.35);
   }
   *{box-sizing:border-box}
@@ -15,13 +16,13 @@
        background: radial-gradient(1200px 600px at 10% -10%, #11203f 0%, transparent 60%),
                    radial-gradient(1000px 500px at 110% 10%, #12243f 0%, transparent 60%),
                    var(--bg);
-       padding:20px}
+       padding:18px}
   .app{max-width:1200px;margin:0 auto}
   h1{margin:0 0 14px;font-size:clamp(22px,3.2vw,32px)}
   .panel{background:linear-gradient(180deg,#0f1a2e,#0b1221); border:1px solid var(--border);
          border-radius:var(--radius); box-shadow:var(--shadow); padding:16px}
   .controls{display:grid; gap:12px}
-  @media (min-width:760px){ .controls{ grid-template-columns: 1.1fr 1.1fr 1fr; align-items:end } }
+  @media (min-width:760px){ .controls{ grid-template-columns:1.1fr 1.1fr 1fr; align-items:end } }
   label{display:block; font-size:14px; color:var(--muted); margin-bottom:6px}
   select,input[type="text"],input[type="number"]{
     width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--border);
@@ -29,18 +30,23 @@
   }
   select:focus,input:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(56,189,248,.18) }
   .hint{color:var(--muted); font-size:12px; margin-top:6px}
-  .actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:12px}
-  button{
-    border:1px solid var(--border); background:#0d1b31; color:var(--text);
-    padding:10px 14px; border-radius:12px; cursor:pointer;
-  }
-  button.primary{background:linear-gradient(90deg,#22d3ee,#38bdf8); color:#081320; font-weight:600}
+
+  .actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; align-items:center}
+  button{border:1px solid var(--border); background:#0d1b31; color:var(--text);
+         padding:10px 14px; border-radius:12px; cursor:pointer}
+  button.primary{background:linear-gradient(90deg,var(--accent2),var(--accent)); color:#081320; font-weight:600}
   button:disabled{opacity:.6; cursor:not-allowed}
+
+  /* Progreso */
+  .progress{width:240px; height:10px; background:#0a1323; border:1px solid var(--border);
+            border-radius:999px; overflow:hidden}
+  .bar{height:100%; width:0%; background:linear-gradient(90deg,var(--ok),var(--accent));
+       transition:width .2s}
 
   /* Tabla */
   .table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch; margin-top:16px;
               border:1px solid var(--border); border-radius:14px}
-  table{width:100%; border-collapse:separate; border-spacing:0; min-width:900px}
+  table{width:100%; border-collapse:separate; border-spacing:0; min-width:940px}
   thead th{position:sticky; top:0; z-index:2; background:#0e213a; color:#cfe7ff; padding:10px;
            border-bottom:1px solid var(--border)}
   tbody td{padding:8px; border-bottom:1px solid var(--border); text-align:center}
@@ -48,8 +54,9 @@
   .left{text-align:left}
   .badge{display:inline-block; padding:4px 8px; border:1px solid var(--border);
          border-radius:999px; background:#0a1323; color:#cbd5e1; font-size:12px}
+  .disabled{opacity:.6}
 
-  /* Móvil: filas como tarjetas con etiquetas */
+  /* Móvil: tarjetas con etiquetas */
   @media (max-width:640px){
     table{min-width:0}
     thead{display:none}
@@ -60,7 +67,7 @@
   }
 
   .errorCell{outline:2px solid var(--danger); outline-offset:2px; border-radius:8px}
-  .msg{margin-top:10px; font-size:14px}
+  .msg{margin-top:8px; font-size:14px}
   .msg.error{color:var(--danger)}
   .msg.ok{color:var(--ok)}
 </style>
@@ -74,22 +81,26 @@
       <div>
         <label for="selIngeniero">Ingeniero que revisa</label>
         <select id="selIngeniero"><option value="">— Selecciona —</option></select>
-        <div class="hint">Fuente: pestaña <b>Ingenieros</b> (columna B)</div>
+        <div class="hint">Fuente: <b>Ingenieros</b> (columna B)</div>
       </div>
 
       <div>
         <label for="selCuadrilla">Cuadrilla</label>
         <select id="selCuadrilla" disabled><option value="">— Selecciona —</option></select>
-        <div class="hint">Lista desde pestaña <b>cuadrillas</b> (columna A)</div>
+        <div class="hint">Lista: pestaña <b>cuadrillas</b> (columna A)</div>
       </div>
 
       <div>
         <label for="filtro">Filtrar material</label>
-        <input id="filtro" type="text" placeholder="Buscar por código o nombre…" disabled />
+        <input id="filtro" type="text" placeholder="Código o nombre…" disabled />
       </div>
     </div>
 
     <div class="actions">
+      <div class="progress" title="Progreso de filas válidas marcadas">
+        <div id="bar" class="bar"></div>
+      </div>
+      <span id="progTxt" class="hint">0/0</span>
       <button id="btnRegistrar" class="primary" disabled>Registrar seleccionados</button>
       <span id="status" class="msg"></span>
     </div>
@@ -116,6 +127,301 @@
     <div class="hint">En móvil, cada fila se muestra como tarjeta con etiquetas.</div>
   </div>
 </div>
+
+<script>
+  /* ===== CONFIG ===== */
+  const SHEET_ID  = "1dtIWNjOyysVWy9Z0aIkygfwn2h6ihFXAp1nnZaQ8JXY";
+  const API_KEY   = "AIzaSyAnPJKpsn34tTYdiKK0aiRW78r3NhQOx9s";
+
+  // Pestañas
+  const ING_SHEET        = "Ingenieros"; // B2:B
+  const CUADRILLAS_SHEET = "cuadrillas"; // A2:A
+  const MATERIALS_SHEET  = "base";       // A:I (min)
+
+  // Índices en "base" (0-index)
+  // A=0 Cuadrilla, B=1 Código, C=2 Nombre, D=3 TIPOMATERIAL, I=8 FISICO TEORICO
+  const COL = { CUADRILLA:0, CODIGO:1, NOMBRE:2, TIPO:3, FIS_TEO:8 };
+
+  // ENDPOINT de Apps Script (cámbialo cuando crees tu Web App)
+  // Debe aceptar POST JSON y escribir en la pestaña "registro".
+  const ENDPOINT_URL = ""; // <-- pega aquí tu URL de Web App cuando la tengas
+
+  /* ===== ELEMENTOS ===== */
+  const selIngeniero = document.getElementById("selIngeniero");
+  const selCuadrilla = document.getElementById("selCuadrilla");
+  const filtro       = document.getElementById("filtro");
+  const tbody        = document.querySelector("#materialTable tbody");
+  const btnRegistrar = document.getElementById("btnRegistrar");
+  const statusMsg    = document.getElementById("status");
+  const bar          = document.getElementById("bar");
+  const progTxt      = document.getElementById("progTxt");
+
+  let materiales = []; // todos
+  let cuadrillas = [];
+
+  /* ===== INIT ===== */
+  document.addEventListener("DOMContentLoaded", async () => {
+    await loadIngenieros();
+    await loadCuadrillas();
+    await loadMateriales();
+    updateControls();
+  });
+
+  async function gFetch(rangeA1){
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(rangeA1)}?key=${API_KEY}`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error(`HTTP ${res.status} al leer ${rangeA1}`);
+    const data = await res.json();
+    return data.values || [];
+  }
+
+  async function loadIngenieros(){
+    try{
+      selIngeniero.innerHTML = `<option value="">Cargando…</option>`;
+      const v = await gFetch(`${ING_SHEET}!B2:B`);
+      selIngeniero.innerHTML = `<option value="">— Selecciona —</option>`;
+      v.forEach(r=>{
+        const name = r?.[0]?.trim();
+        if(name){
+          const opt=document.createElement("option");
+          opt.value=name; opt.textContent=name;
+          selIngeniero.appendChild(opt);
+        }
+      });
+    }catch(e){ selIngeniero.innerHTML=`<option value="">(Error al cargar)</option>`; console.error(e); }
+  }
+
+  async function loadCuadrillas(){
+    try{
+      selCuadrilla.innerHTML = `<option value="">Cargando…</option>`;
+      const v = await gFetch(`${CUADRILLAS_SHEET}!A2:A`);
+      cuadrillas = v.map(r=>r?.[0]).filter(Boolean).map(s=>s.toString().trim());
+      cuadrillas.sort((a,b)=>a.localeCompare(b,'es'));
+      selCuadrilla.innerHTML = `<option value="">— Selecciona —</option>`;
+      cuadrillas.forEach(c=>{
+        const opt=document.createElement("option");
+        opt.value=c; opt.textContent=c;
+        selCuadrilla.appendChild(opt);
+      });
+    }catch(e){ selCuadrilla.innerHTML=`<option value="">(Error al cargar)</option>`; console.error(e); }
+  }
+
+  async function loadMateriales(){
+    try{
+      const v = await gFetch(`${MATERIALS_SHEET}!A:I`);
+      materiales = v.slice(1); // sin encabezado
+    }catch(e){ console.error("Materiales:", e); materiales=[]; }
+  }
+
+  function updateControls(){
+    const enabled = selIngeniero.value !== "";
+    selCuadrilla.disabled = !enabled;
+    filtro.disabled       = !enabled;
+    btnRegistrar.disabled = !enabled;
+    if(!enabled){
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:14px">Selecciona Ingeniero…</td></tr>`;
+    }
+    updateProgress();
+  }
+
+  selIngeniero.addEventListener("change", ()=>{ updateControls(); clearTable("Elige una cuadrilla…"); });
+  selCuadrilla.addEventListener("change", ()=>{ filtro.value=""; paintTable(); });
+  filtro.addEventListener("input", paintTable);
+
+  function clearTable(msg){
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:14px">${msg}</td></tr>`;
+    updateProgress();
+  }
+
+  function paintTable(){
+    statusMsg.textContent = "";
+    const ingOK = selIngeniero.value!=="";
+    const cSel  = selCuadrilla.value;
+    if(!ingOK){ clearTable("Selecciona Ingeniero."); return; }
+    if(!cSel){  clearTable("Selecciona Cuadrilla."); return; }
+
+    const q = (filtro.value||"").toLowerCase().trim();
+    const rows = materiales.filter(r=>{
+      const cu  = (r[COL.CUADRILLA]??"").toString();
+      const co  = (r[COL.CODIGO]??"").toString();
+      const no  = (r[COL.NOMBRE]??"").toString();
+      if(cu!==cSel) return false;
+      if(!q) return true;
+      return co.toLowerCase().includes(q)||no.toLowerCase().includes(q);
+    });
+
+    if(rows.length===0){ clearTable("Sin materiales para esa cuadrilla."); return; }
+
+    const frag = document.createDocumentFragment();
+    tbody.innerHTML = "";
+    rows.forEach(r=>{
+      const cu  = r[COL.CUADRILLA] ?? "";
+      const co  = r[COL.CODIGO] ?? "";
+      const no  = r[COL.NOMBRE] ?? "";
+      const tp  = (r[COL.TIPO] ?? "").toString().toLowerCase(); // "seriado"|"no seriado"
+      const ft  = (r[COL.FIS_TEO] ?? "").toString();
+
+      const isSeriado = tp.includes("seriado"); // solo si dice Seriado
+      const tr  = document.createElement("tr");
+
+      tr.innerHTML = `
+        <td data-label="Incluir"><input type="checkbox" class="chk"></td>
+        <td data-label="Cuadrilla">${cu}</td>
+        <td data-label="Código"><span class="badge"># ${co}</span></td>
+        <td class="left" data-label="Nombre">${no}</td>
+        <td data-label="Físico Teórico">${ft || "0"}</td>
+        <td data-label="Ingreso">
+          <select class="modo" ${!isSeriado ? 'disabled title="Solo cantidad (No Seriado)"' : ""}>
+            ${isSeriado
+              ? '<option value="cantidad">Cantidad</option><option value="serie">Serie</option>'
+              : '<option value="cantidad" selected>Cantidad</option>'}
+          </select>
+        </td>
+        <td data-label="Cantidad"><input type="number" class="cant" inputmode="decimal" min="0" step="any" placeholder="0" ${isSeriado ? "" : ""}></td>
+        <td data-label="Serie(s)"><input type="text" class="series" placeholder="Ej: ABC123,ABC124" ${isSeriado ? "" : "disabled"}></td>
+      `;
+
+      // Inicializa modo según seriado
+      const modo = tr.querySelector(".modo");
+      const cant = tr.querySelector(".cant");
+      const ser  = tr.querySelector(".series");
+      setMode(isSeriado ? "cantidad" : "cantidad", cant, ser, isSeriado);
+
+      if(isSeriado){
+        modo.addEventListener("change", ()=> setMode(modo.value, cant, ser, true));
+      }
+
+      // recalcular progreso cuando cambian campos / checkbox
+      tr.querySelector(".chk").addEventListener("change", updateProgress);
+      cant.addEventListener("input", updateProgress);
+      ser.addEventListener("input", updateProgress);
+
+      frag.appendChild(tr);
+    });
+    tbody.appendChild(frag);
+    updateProgress();
+  }
+
+  function setMode(mode, qtyInput, seriesInput, isSeriado){
+    if(!isSeriado){
+      qtyInput.disabled = false; seriesInput.disabled = true; seriesInput.value="";
+      return;
+    }
+    if(mode==="cantidad"){
+      qtyInput.disabled = false; seriesInput.disabled = true; seriesInput.value="";
+    }else{
+      qtyInput.disabled = true;  qtyInput.value=""; seriesInput.disabled = false;
+    }
+  }
+
+  function updateProgress(){
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+    let checked=0, valid=0;
+
+    rows.forEach(tr=>{
+      const chk = tr.querySelector(".chk");
+      if(!chk) return;
+      if(chk.checked){
+        checked++;
+        const modo = tr.querySelector(".modo")?.value || "cantidad";
+        const cant = tr.querySelector(".cant");
+        const ser  = tr.querySelector(".series");
+        const seriadoEnabled = !ser.disabled; // si está habilitado, puede ser por serie
+
+        let ok=false;
+        if(seriadoEnabled && modo==="serie"){
+          ok = !!(ser.value||"").trim();
+        }else{
+          const v = parseFloat(cant.value);
+          ok = v>0;
+        }
+        if(ok) valid++;
+      }
+    });
+
+    const pct = checked? Math.round((valid/checked)*100) : 0;
+    bar.style.width = (checked? pct:0) + "%";
+    progTxt.textContent = `${valid}/${checked}`;
+  }
+
+  // Validación + “envío”
+  btnRegistrar.addEventListener("click", async ()=>{
+    statusMsg.textContent = "";
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+    if(rows.length===0){ return; }
+
+    const errores = [];
+    const registros = [];
+
+    rows.forEach(tr=>{
+      const chk   = tr.querySelector(".chk");
+      if(!chk || !chk.checked) return;
+
+      const cuadr = tr.children[1]?.innerText?.trim();
+      const cod   = tr.children[2]?.innerText?.replace("#","").trim();
+      const nom   = tr.children[3]?.innerText?.trim();
+      const modo  = tr.querySelector(".modo")?.value || "cantidad";
+      const cant  = tr.querySelector(".cant");
+      const ser   = tr.querySelector(".series");
+      const seriadoEnabled = !ser.disabled;
+
+      // limpia estilos
+      cant.classList.remove("errorCell");
+      ser.classList.remove("errorCell");
+
+      if(seriadoEnabled && modo==="serie"){
+        const val = (ser.value||"").trim();
+        if(!val){ ser.classList.add("errorCell"); errores.push(`Serie(s) faltante(s) para ${cod} – ${nom}`); return; }
+        registros.push({cuadrilla:cuadr, reviso: selIngeniero.value, codigo:cod, cantidad:"", seriado:"Y", serie:val, fecha:new Date().toISOString()});
+      }else{
+        const val = parseFloat(cant.value);
+        if(!(val>0)){ cant.classList.add("errorCell"); errores.push(`Cantidad faltante para ${cod} – ${nom}`); return; }
+        registros.push({cuadrilla:cuadr, reviso: selIngeniero.value, codigo:cod, cantidad:val, seriado:"N", serie:"", fecha:new Date().toISOString()});
+      }
+    });
+
+    if(errores.length){
+      statusMsg.className="msg error";
+      statusMsg.textContent = `Revisa: ${errores.join(" • ")}`;
+      return;
+    }
+    if(registros.length===0){
+      statusMsg.className="msg error";
+      statusMsg.textContent = "No marcaste ninguna fila para registrar.";
+      return;
+    }
+
+    // Envío (opcional): requiere Apps Script Web App
+    if(!ENDPOINT_URL){
+      console.log("Payload listo para enviar:", registros);
+      statusMsg.className="msg ok";
+      statusMsg.textContent = `OK: ${registros.length} registro(s) válido(s). (Configura ENDPOINT_URL para escribir en 'registro')`;
+      return;
+    }
+
+    try{
+      btnRegistrar.disabled = true;
+      statusMsg.className="msg";
+      statusMsg.textContent = "Enviando…";
+      const resp = await fetch(ENDPOINT_URL, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ registros })
+      });
+      if(!resp.ok) throw new Error("HTTP "+resp.status);
+      statusMsg.className="msg ok";
+      statusMsg.textContent = "Registrado correctamente.";
+    }catch(e){
+      console.error(e);
+      statusMsg.className="msg error";
+      statusMsg.textContent = "Error al registrar. Revisa el ENDPOINT_URL.";
+    }finally{
+      btnRegistrar.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
 
 <script>
   /* ===== CONFIG ===== */
