@@ -1,102 +1,305 @@
-<label for="selIngeniero">Ingeniero que revisa:</label>
-<select id="selIngeniero">
-  <option value="">— Selecciona —</option>
-</select>
-
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Control de Materiales</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Control de Materiales</title>
+
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background: #f4f4f4; }
-    input { width: 100px; text-align: right; }
-    .notice { background:#fff8e1; border:1px solid #ffecb3; padding:10px; border-radius:6px; }
+    :root{
+      --bg:#0f172a;            /* slate-900 */
+      --panel:#111827;         /* gray-900 */
+      --card:#0b1221;          /* deep card */
+      --muted:#94a3b8;         /* slate-400 */
+      --text:#e5e7eb;          /* gray-200 */
+      --accent:#22d3ee;        /* cyan-400 */
+      --accent-2:#38bdf8;      /* sky-400 */
+      --ok:#10b981;            /* emerald-500 */
+      --warn:#f59e0b;          /* amber-500 */
+      --danger:#ef4444;        /* red-500 */
+      --border:#1f2937;        /* gray-800 */
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius:16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family: ui-sans-serif,system-ui,Segoe UI,Roboto,Arial;
+      background: radial-gradient(1200px 600px at 10% -10%, #11203f 0%, transparent 60%),
+                  radial-gradient(1000px 500px at 110% 10%, #12243f 0%, transparent 60%),
+                  var(--bg);
+      color:var(--text);
+      padding:24px;
+    }
+
+    .app{
+      max-width:1200px; margin:0 auto;
+    }
+
+    .title{
+      font-size: clamp(22px, 3.2vw, 32px);
+      display:flex; align-items:center; gap:12px; margin:0 0 14px 0;
+    }
+    .title .dot{
+      width:10px; height:10px; border-radius:999px; background:linear-gradient(90deg,var(--accent),var(--accent-2));
+      box-shadow: 0 0 20px var(--accent);
+    }
+    .panel{
+      background:linear-gradient(180deg,#0e1729 0%, #0b1221 100%);
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding:16px;
+    }
+
+    .controls{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:12px;
+    }
+    @media (min-width:700px){
+      .controls{ grid-template-columns: 1.3fr 1.3fr 1fr; align-items:end; }
+    }
+
+    label{font-size:14px; color:var(--muted); margin-bottom:6px; display:block;}
+    select, input[type="number"], input[type="text"]{
+      width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--border);
+      background:#0a1220; color:var(--text); outline:none;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    select:focus, input:focus{ border-color:var(--accent-2); box-shadow:0 0 0 3px rgba(34,211,238,.15); }
+
+    .hint{ color:var(--muted); font-size:13px; margin-top:6px; }
+
+    .table-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; margin-top:18px; border-radius:14px; border:1px solid var(--border); }
+    table{ width:100%; border-collapse:separate; border-spacing:0; min-width:760px; }
+    thead th{
+      position:sticky; top:0; z-index:2;
+      background:linear-gradient(180deg,#0e213a,#0c1a2d);
+      color:#bfe9ff; text-align:center; font-weight:600; letter-spacing:.2px;
+      padding:12px; border-bottom:1px solid var(--border);
+    }
+    tbody td{ padding:10px 8px; text-align:center; border-bottom:1px solid var(--border); }
+    tbody tr:hover{ background:rgba(56,189,248,.08); }
+    .col-name{ text-align:left; }
+
+    .badge{
+      display:inline-flex; gap:6px; align-items:center;
+      border:1px solid var(--border); padding:6px 10px; border-radius:999px;
+      background:#0a1323; color:#cbd5e1; font-size:12px;
+    }
+    .loading{ color:var(--muted); padding:16px; text-align:center; }
+    .error{ color:var(--danger); padding:16px; text-align:center; }
+
+    .footer-note{
+      margin-top:14px; font-size:12px; color:var(--muted);
+    }
   </style>
 </head>
 <body>
-  <h1>Control de Materiales</h1>
-  <p class="notice">
-    En el siguiente paso configuraremos Google Sheets. Por ahora esto es un esqueleto funcional.
-  </p>
+  <div class="app">
+    <h1 class="title"><span class="dot"></span>Control de Materiales</h1>
 
-  <table id="materialTable">
-    <thead>
-      <tr>
-        <th>Cuadrilla</th>
-        <th>Material</th>
-        <th>Cantidad Teórica</th>
-        <th>Cantidad Física (Ingresar)</th>
-      </tr>
-    </thead>
-    <tbody>
-      <!-- Se llenará con datos del Sheet en el siguiente paso -->
-    </tbody>
-  </table>
+    <div class="panel">
+      <div class="controls">
+        <div>
+          <label for="selIngeniero">Ingeniero que revisa</label>
+          <select id="selIngeniero">
+            <option value="">— Selecciona —</option>
+          </select>
+          <div class="hint">Fuente: pestaña <strong>Ingenieros</strong> (columna “Supervisor”)</div>
+        </div>
+
+        <div>
+          <label for="selCuadrilla">Cuadrilla</label>
+          <select id="selCuadrilla" disabled>
+            <option value="">— Selecciona —</option>
+          </select>
+          <div class="hint">Se habilita al seleccionar Ingeniero</div>
+        </div>
+
+        <div>
+          <label for="filtro">Filtrar material</label>
+          <input id="filtro" type="text" placeholder="Buscar por código o nombre…" disabled />
+        </div>
+      </div>
+
+      <div class="table-wrap" id="tablaWrap">
+        <table id="materialTable" aria-describedby="tabla-descr">
+          <thead>
+            <tr>
+              <th>Cuadrilla</th>
+              <th>Código Material</th>
+              <th style="text-align:left;padding-left:12px;">Nombre Material</th>
+              <th>Físico Teórico</th>
+              <th>Físico Real (Ingresar)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="loading" colspan="5">Selecciona Ingeniero y Cuadrilla…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="tabla-descr" class="footer-note">Desliza horizontalmente en móvil si es necesario.</div>
+    </div>
+
+    <p class="footer-note">Tip: puedes marcar tu página como app en el móvil (Añadir a pantalla de inicio) para usarla a pantalla completa.</p>
+  </div>
 
   <script>
-    // TODO: En el próximo paso añadiremos la conexión real a Google Sheets.
-    // Por ahora, cargamos unos datos de ejemplo para verificar que la página funciona.
-    const datosEjemplo = [
-      ["Cuadrilla A", "Cemento", 120],
-      ["Cuadrilla B", "Arena", 80],
-      ["Cuadrilla C", "Grava", 60],
-    ];
+    /* ========= CONFIG ========= */
+    const SHEET_ID  = "1dtIWNjOyysVWy9Z0aIkygfwn2h6ihFXAp1nnZaQ8JXY";
+    const API_KEY   = "AIzaSyAnPJKpsn34tTYdiKK0aiRW78r3NhQOx9s";
 
-    const tbody = document.querySelector("#materialTable tbody");
-    datosEjemplo.forEach(([cuadrilla, material, teorico]) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${cuadrilla}</td>
-        <td>${material}</td>
-        <td>${teorico}</td>
-        <td><input type="number" placeholder="0" min="0" step="any"></td>
-      `;
-      tbody.appendChild(tr);
+    // Nombres de pestañas en el Google Sheet
+    const ING_SHEET       = "Ingenieros";   // Columna B: "Supervisor" (B2:B)
+    const MATERIALS_SHEET = "base";         // Columnas: A Cuadrilla, B Código, C Nombre, H Físico Teórico
+
+    // Índices de columnas en la pestaña de materiales (base)
+    const COL = { CUADRILLA:0, CODIGO:1, NOMBRE:2, FIS_TEO:7 };
+
+    /* ========= ELEMENTOS ========= */
+    const selIngeniero = document.getElementById("selIngeniero");
+    const selCuadrilla = document.getElementById("selCuadrilla");
+    const filtro       = document.getElementById("filtro");
+    const tbody        = document.querySelector("#materialTable tbody");
+
+    let materiales = [];      // matriz completa desde Sheets
+    let cuadrillas = [];      // lista única de cuadrillas
+
+    /* ========= CARGA INICIAL ========= */
+    document.addEventListener("DOMContentLoaded", async () => {
+      await cargarIngenieros();
+      await prefetchMateriales();   // traemos materiales una sola vez
+      prepararCuadrillas();         // pero no habilitamos hasta elegir ingeniero
     });
+
+    /* ========= GOOGLE SHEETS HELPERS ========= */
+    async function fetchSheetRange(rangeA1){
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(rangeA1)}?key=${API_KEY}`;
+      const res = await fetch(url);
+      if(!res.ok) throw new Error("Error HTTP "+res.status);
+      const data = await res.json();
+      return data.values || [];
+    }
+
+    async function cargarIngenieros(){
+      try{
+        selIngeniero.innerHTML = `<option value="">Cargando…</option>`;
+        const values = await fetchSheetRange(`${ING_SHEET}!B2:B`);
+        selIngeniero.innerHTML = `<option value="">— Selecciona —</option>`;
+        values.forEach(row=>{
+          const nombre = (row && row[0]) ? row[0].trim() : "";
+          if(nombre){
+            const opt = document.createElement("option");
+            opt.value = nombre; opt.textContent = nombre;
+            selIngeniero.appendChild(opt);
+          }
+        });
+      }catch(e){
+        console.error(e);
+        selIngeniero.innerHTML = `<option value="">(Error al cargar)</option>`;
+      }
+    }
+
+    async function prefetchMateriales(){
+      try{
+        const values = await fetchSheetRange(`${MATERIALS_SHEET}!A:H`);
+        // Quita encabezado
+        materiales = values.slice(1);
+      }catch(e){
+        console.error("Error cargando materiales:", e);
+        materiales = [];
+      }
+    }
+
+    function prepararCuadrillas(){
+      const set = new Set();
+      materiales.forEach(row=>{
+        const cuad = (row[COL.CUADRILLA] ?? "").toString().trim();
+        if(cuad) set.add(cuad);
+      });
+      cuadrillas = Array.from(set).sort((a,b)=>a.localeCompare(b,'es'));
+      renderCuadrillas();
+    }
+
+    function renderCuadrillas(){
+      selCuadrilla.innerHTML = `<option value="">— Selecciona —</option>`;
+      cuadrillas.forEach(c=>{
+        const opt = document.createElement("option");
+        opt.value = c; opt.textContent = c;
+        selCuadrilla.appendChild(opt);
+      });
+      selCuadrilla.disabled = (selIngeniero.value === "");
+      filtro.disabled       = (selIngeniero.value === "");
+    }
+
+    /* ========= EVENTOS ========= */
+    selIngeniero.addEventListener("change", ()=>{
+      renderCuadrillas();
+      clearTable("Elige una cuadrilla…");
+      filtro.value = "";
+    });
+
+    selCuadrilla.addEventListener("change", ()=>{
+      filtro.value = "";
+      pintarTabla();
+    });
+
+    filtro.addEventListener("input", ()=>{
+      pintarTabla();
+    });
+
+    /* ========= RENDER TABLA ========= */
+    function clearTable(msg){
+      tbody.innerHTML = `<tr><td class="loading" colspan="5">${msg}</td></tr>`;
+    }
+
+    function pintarTabla(){
+      const ingOk = selIngeniero.value !== "";
+      const cSel  = selCuadrilla.value;
+
+      if(!ingOk){ clearTable("Selecciona un ingeniero."); return; }
+      if(!cSel){  clearTable("Selecciona una cuadrilla."); return; }
+
+      const q = (filtro.value || "").toLowerCase().trim();
+
+      const rows = materiales.filter(row=>{
+        const cuad   = (row[COL.CUADRILLA] ?? "").toString();
+        const codigo = (row[COL.CODIGO] ?? "").toString();
+        const nombre = (row[COL.NOMBRE] ?? "").toString();
+        if(cuad !== cSel) return false;
+        if(!q) return true;
+        return codigo.toLowerCase().includes(q) || nombre.toLowerCase().includes(q);
+      });
+
+      if(rows.length === 0){
+        clearTable("No hay materiales para esa cuadrilla.");
+        return;
+      }
+
+      const fr = document.createDocumentFragment();
+      tbody.innerHTML = "";
+
+      rows.forEach(r=>{
+        const cuad   = r[COL.CUADRILLA] ?? "";
+        const codigo = r[COL.CODIGO] ?? "";
+        const nombre = r[COL.NOMBRE] ?? "";
+        const fisT   = r[COL.FIS_TEO] ?? "";
+
+        const tr = document.createElement("tr");
+        const tdCuad = `<td>${cuad}</td>`;
+        const tdCod  = `<td><span class="badge"># ${codigo}</span></td>`;
+        const tdNom  = `<td class="col-name" style="text-align:left;padding-left:12px;">${nombre}</td>`;
+        const tdTeo  = `<td>${fisT}</td>`;
+        const tdReal = `<td><input type="number" inputmode="decimal" placeholder="0" min="0" step="any" aria-label="Físico real para ${nombre}"></td>`;
+
+        tr.innerHTML = tdCuad + tdCod + tdNom + tdTeo + tdReal;
+        fr.appendChild(tr);
+      });
+
+      tbody.appendChild(fr);
+    }
   </script>
 </body>
 </html>
-<script>
-  // ✅ TUS CREDENCIALES (deja las que ya tienes)
-  const SHEET_ID  = "1dtIWNjOyysVWy9Z0aIkygfwn2h6ihFXAp1nnZaQ8JXY";
-  const API_KEY   = "AIzaSyAnPJKpsn34tTYdiKK0aiRW78r3NhQOx9s";
-
-  // Pestaña con la lista de ingenieros
-  const ING_SHEET = "Ingenieros";
-
-  // Carga la lista de ingenieros desde Ingenieros!B2:B (columna “Supervisor”)
-  async function cargarIngenieros() {
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(ING_SHEET + "!B2:B")}?key=${API_KEY}`;
-    const sel = document.getElementById("selIngeniero");
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-      const values = data.values || [];
-
-      // Limpia y rellena
-      sel.innerHTML = `<option value="">— Selecciona —</option>`;
-      values.forEach(row => {
-        const nombre = (row && row[0]) ? row[0] : "";
-        if (nombre) {
-          const opt = document.createElement("option");
-          opt.value = nombre;
-          opt.textContent = nombre;
-          sel.appendChild(opt);
-        }
-      });
-    } catch (e) {
-      console.error("Error cargando ingenieros:", e);
-      sel.innerHTML = `<option value="">(Error al cargar)</option>`;
-    }
-  }
-
-  // Llamar al cargar la página
-  document.addEventListener("DOMContentLoaded", cargarIngenieros);
-</script>
