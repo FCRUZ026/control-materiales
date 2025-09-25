@@ -273,43 +273,61 @@ const ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbz2vjCOAoW8xlvVOnm
     return data.values || [];
   }
 
-  async function loadIngenieros(){
-    try{
-      selIngeniero.innerHTML = `<option value="">Cargando…</option>`;
-      const v = await gFetch(`${ING_SHEET}!B2:B`);
-      selIngeniero.innerHTML = `<option value="">— Selecciona —</option>`;
-      v.forEach(r=>{
-        const name = r?.[0]?.trim();
-        if(name){
-          const opt=document.createElement("option");
-          opt.value=name; opt.textContent=name;
-          selIngeniero.appendChild(opt);
-        }
-      });
-    }catch(e){ selIngeniero.innerHTML=`<option value="">(Error al cargar)</option>`; console.error(e); }
+async function loadIngenieros(){
+  try{
+    selIngeniero.innerHTML = '<option value="">Cargando…</option>';
+    const v = await gFetch(ING_SHEET + '!B2:B');
+    selIngeniero.innerHTML = '<option value="">— Selecciona —</option>';
+    for (var i=0;i<v.length;i++){
+      var r = v[i];
+      var name = (r && r[0]) ? String(r[0]).trim() : "";
+      if(name){
+        var opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        selIngeniero.appendChild(opt);
+      }
+    }
+    if(selIngeniero.options.length === 1){
+      var opt2 = document.createElement('option');
+      opt2.value = '';
+      opt2.textContent = '(Sin datos en ' + ING_SHEET + '!B2:B)';
+      selIngeniero.appendChild(opt2);
+    }
+  }catch(e){
+    selIngeniero.innerHTML = '<option value="">(Error al cargar)</option>';
+    console.error(e);
   }
+}
 
-  async function loadCuadrillas(){
-    try{
-      selCuadrilla.innerHTML = `<option value="">Cargando…</option>`;
-      const v = await gFetch(`${CUADRILLAS_SHEET}!A2:A`);
-      cuadrillas = v.map(r=>r?.[0]).filter(Boolean).map(s=>s.toString().trim());
-      cuadrillas.sort((a,b)=>a.localeCompare(b,'es'));
-      selCuadrilla.innerHTML = `<option value="">— Selecciona —</option>`;
-      cuadrillas.forEach(c=>{
-        const opt=document.createElement("option");
-        opt.value=c; opt.textContent=c;
-        selCuadrilla.appendChild(opt);
-      });
-    }catch(e){ selCuadrilla.innerHTML=`<option value="">(Error al cargar)</option>`; console.error(e); }
+async function loadCuadrillas(){
+  try{
+    selCuadrilla.innerHTML = '<option value="">Cargando…</option>';
+    const v = await gFetch(CUADRILLAS_SHEET + '!A2:A');
+    cuadrillas = [];
+    for (var i=0;i<v.length;i++){
+      var r = v[i];
+      var val = (r && r[0]) ? String(r[0]).trim() : '';
+      if(val){ cuadrillas.push(val); }
+    }
+    cuadrillas.sort(function(a,b){ return a.localeCompare(b,'es'); });
+    selCuadrilla.innerHTML = '<option value="">— Selecciona —</option>';
+    for (var j=0;j<cuadrillas.length;j++){
+      var c = cuadrillas[j];
+      var opt = document.createElement('option');
+      opt.value = c; opt.textContent = c;
+      selCuadrilla.appendChild(opt);
+    }
+    if(selCuadrilla.options.length === 1){
+      var opt2 = document.createElement('option');
+      opt2.value=''; opt2.textContent='(Sin datos en cuadrillas!A2:A)';
+      selCuadrilla.appendChild(opt2);
+    }
+  }catch(e){
+    selCuadrilla.innerHTML = '<option value="">(Error al cargar)</option>';
+    console.error(e);
   }
-
-  async function loadMateriales(){
-    try{
-      const v = await gFetch(`${MATERIALS_SHEET}!A:I`);
-      materiales = v.slice(1); // sin encabezado
-    }catch(e){ console.error("Materiales:", e); materiales=[]; }
-  }
+}
 
   function updateControls(){
     const enabled = selIngeniero.value !== "";
@@ -339,10 +357,16 @@ const ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbz2vjCOAoW8xlvVOnm
     if(!cSel){  clearTable("Selecciona Cuadrilla."); return; }
 
     const q = (filtro.value||"").toLowerCase().trim();
-    const rows = materiales.filter(r=>{
-      const cu  = (r[COL.CUADRILLA]??"").toString();
-      const co  = (r[COL.CODIGO]??"").toString();
-      const no  = (r[COL.NOMBRE]??"").toString();
+const rows = materiales.filter(function(r){
+  const cu  = (r[COL.CUADRILLA]!=null ? r[COL.CUADRILLA] : '').toString();
+  const co  = (r[COL.CODIGO]!=null    ? r[COL.CODIGO]    : '').toString();
+  const no  = (r[COL.NOMBRE]!=null    ? r[COL.NOMBRE]    : '').toString();
+const cu  = (r[COL.CUADRILLA]!=null ? r[COL.CUADRILLA] : "");
+const co  = (r[COL.CODIGO]!=null    ? r[COL.CODIGO]    : "");
+const no  = (r[COL.NOMBRE]!=null    ? r[COL.NOMBRE]    : "");
+const tp  = ((r[COL.TIPO]!=null ? r[COL.TIPO] : "") + "").toLowerCase();
+const ft  = (r[COL.FIS_TEO]!=null ? r[COL.FIS_TEO] : "0").toString();
+
       if(cu!==cSel) return false;
       if(!q) return true;
       return co.toLowerCase().includes(q)||no.toLowerCase().includes(q);
