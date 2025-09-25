@@ -350,115 +350,120 @@ async function loadCuadrillas(){
   }
 
   function paintTable(){
-    statusMsg.textContent = "";
-    const ingOK = selIngeniero.value!=="";
-    const cSel  = selCuadrilla.value;
-    if(!ingOK){ clearTable("Selecciona Ingeniero."); return; }
-    if(!cSel){  clearTable("Selecciona Cuadrilla."); return; }
+  statusMsg.textContent = "";
+  const ingOK = selIngeniero.value !== "";
+  const cSel  = selCuadrilla.value;
+  if(!ingOK){ clearTable("Selecciona Ingeniero."); return; }
+  if(!cSel){  clearTable("Selecciona Cuadrilla."); return; }
 
-    const q = (filtro.value||"").toLowerCase().trim();
-const rows = materiales.filter(function(r){
-  const cu  = (r[COL.CUADRILLA]!=null ? r[COL.CUADRILLA] : '').toString();
-  const co  = (r[COL.CODIGO]!=null    ? r[COL.CODIGO]    : '').toString();
-  const no  = (r[COL.NOMBRE]!=null    ? r[COL.NOMBRE]    : '').toString();
-const cu  = (r[COL.CUADRILLA]!=null ? r[COL.CUADRILLA] : "");
-const co  = (r[COL.CODIGO]!=null    ? r[COL.CODIGO]    : "");
-const no  = (r[COL.NOMBRE]!=null    ? r[COL.NOMBRE]    : "");
-const tp  = ((r[COL.TIPO]!=null ? r[COL.TIPO] : "") + "").toLowerCase();
-const ft  = (r[COL.FIS_TEO]!=null ? r[COL.FIS_TEO] : "0").toString();
+  const q = (filtro.value || "").toLowerCase().trim();
 
-      if(cu!==cSel) return false;
-      if(!q) return true;
-      return co.toLowerCase().includes(q)||no.toLowerCase().includes(q);
-    });
+  // Filtra SOLO por cuadrilla y (opcional) por texto
+  const rows = materiales.filter(function(r){
+    const cuadrillaVal = (r[COL.CUADRILLA] != null ? r[COL.CUADRILLA] : "").toString();
+    const codigoVal    = (r[COL.CODIGO]    != null ? r[COL.CODIGO]    : "").toString();
+    const nombreVal    = (r[COL.NOMBRE]    != null ? r[COL.NOMBRE]    : "").toString();
 
-    if(rows.length===0){ clearTable("Sin materiales para esa cuadrilla."); return; }
+    if (cuadrillaVal !== cSel) return false;
+    if (!q) return true;
+    return codigoVal.toLowerCase().includes(q) || nombreVal.toLowerCase().includes(q);
+  });
 
-    const frag = document.createDocumentFragment();
-    tbody.innerHTML = "";
-    rows.forEach(r=>{
-      const cu  = r[COL.CUADRILLA] ?? "";
-      const co  = r[COL.CODIGO] ?? "";
-      const no  = r[COL.NOMBRE] ?? "";
-      const tp  = (r[COL.TIPO] ?? "").toString().toLowerCase(); // "seriado"/"no seriado"
-      const ft  = (r[COL.FIS_TEO] ?? "0").toString();
+  if(rows.length === 0){
+    clearTable("Sin materiales para esa cuadrilla.");
+    return;
+  }
 
-      const isSeriado = tp.includes("seriado");
-      const tr  = document.createElement("tr");
+  const frag = document.createDocumentFragment();
+  tbody.innerHTML = "";
 
-      tr.innerHTML = `
-        <td data-label="Incluir"><input type="checkbox" class="chk"></td>
-        <td data-label="Cuadrilla">${cu}</td>
-        <td data-label="Código"><span class="badge"># ${co}</span></td>
-        <td class="left" data-label="Nombre">${no}</td>
-        <td data-label="Físico Teórico">${ft}</td>
-        <td data-label="Ingreso">
-          <select class="modo" ${!isSeriado ? 'disabled title="Solo cantidad (No Seriado)"' : ""}>
-            ${isSeriado
-              ? '<option value="cantidad">Cantidad</option><option value="serie">Serie</option>'
-              : '<option value="cantidad" selected>Cantidad</option>'}
-          </select>
-        </td>
-        <td data-label="Cantidad"><input type="number" class="cant" inputmode="decimal" min="0" step="any" placeholder="0"></td>
-        <td data-label="Serie(s)"><input type="text" class="series" placeholder="Ej: ABC123,ABC124" ${isSeriado ? "" : "disabled"}></td>
-      `;
+  rows.forEach(function(r){
+    const cuadrillaTxt = (r[COL.CUADRILLA] != null ? r[COL.CUADRILLA] : "");
+    const codigoTxt    = (r[COL.CODIGO]    != null ? r[COL.CODIGO]    : "");
+    const nombreTxt    = (r[COL.NOMBRE]    != null ? r[COL.NOMBRE]    : "");
+    const tipoTxt      = ((r[COL.TIPO]     != null ? r[COL.TIPO]      : "") + "").toLowerCase();
+    const fisicoTeo    = (r[COL.FIS_TEO]   != null ? r[COL.FIS_TEO]   : "0").toString();
 
-      const modo = tr.querySelector(".modo");
+    const isSeriado = tipoTxt.indexOf("seriado") !== -1;
+    const tr  = document.createElement("tr");
+
+    tr.innerHTML = '' +
+      '<td data-label="Incluir"><input type="checkbox" class="chk"></td>' +
+      '<td data-label="Cuadrilla">' + cuadrillaTxt + '</td>' +
+      '<td data-label="Código"><span class="badge"># ' + codigoTxt + '</span></td>' +
+      '<td class="left" data-label="Nombre">' + nombreTxt + '</td>' +
+      '<td data-label="Físico Teórico">' + fisicoTeo + '</td>' +
+      '<td data-label="Ingreso">' +
+        '<select class="modo" ' + (!isSeriado ? 'disabled title="Solo cantidad (No Seriado)"' : '') + '>' +
+          (isSeriado
+            ? '<option value="cantidad">Cantidad</option><option value="serie">Serie</option>'
+            : '<option value="cantidad" selected>Cantidad</option>') +
+        '</select>' +
+      '</td>' +
+      '<td data-label="Cantidad"><input type="number" class="cant" inputmode="decimal" min="0" step="any" placeholder="0"></td>' +
+      '<td data-label="Serie(s)"><input type="text" class="series" placeholder="Ej: ABC123,ABC124" ' + (isSeriado ? '' : 'disabled') + '></td>';
+
+    const modo = tr.querySelector(".modo");
+    const cant = tr.querySelector(".cant");
+    const ser  = tr.querySelector(".series");
+
+    if(isSeriado){
+      modo.addEventListener("change", function(){
+        if(modo.value === "serie"){
+          targetSeriesInput = ser;
+          openSeriesWizard();
+        }else{
+          ser.value = "";
+        }
+        updateProgress(); markUnsaved();
+      });
+    }
+
+    tr.querySelector(".chk").addEventListener("change", function(){ updateProgress(); markUnsaved(); });
+    cant.addEventListener("input", function(){ updateProgress(); markUnsaved(); });
+    ser.addEventListener("input",  function(){ updateProgress(); markUnsaved(); });
+
+    frag.appendChild(tr);
+  });
+
+  tbody.appendChild(frag);
+  updateProgress();
+}
+
+  }
+
+function updateProgress(){
+  const rows = Array.from(tbody.querySelectorAll("tr"));
+  let checked = 0, valid = 0;
+
+  rows.forEach(function(tr){
+    const chk = tr.querySelector(".chk");
+    if(!chk) return;
+    if(chk.checked){
+      checked++;
+      const modoEl = tr.querySelector(".modo");
+      const modo = (modoEl && modoEl.value) ? modoEl.value : "cantidad";
       const cant = tr.querySelector(".cant");
       const ser  = tr.querySelector(".series");
+      const seriadoEnabled = ser ? !ser.disabled : false;
 
-      // abrir wizard si cambia a "serie"
-      if(isSeriado){
-        modo.addEventListener("change", ()=>{
-          if(modo.value==="serie"){
-            targetSeriesInput = ser;
-            openSeriesWizard();
-          }else{
-            ser.value = "";
-          }
-          updateProgress(); markUnsaved();
-        });
+      let ok = false;
+      if(seriadoEnabled && modo === "serie"){
+        const sval = ser && ser.value ? ser.value.trim() : "";
+        ok = !!sval;
+      }else{
+        const v = cant && cant.value ? parseFloat(cant.value) : NaN;
+        ok = v > 0;
       }
+      if(ok) valid++;
+    }
+  });
 
-      tr.querySelector(".chk").addEventListener("change", ()=>{ updateProgress(); markUnsaved(); });
-      cant.addEventListener("input", ()=>{ updateProgress(); markUnsaved(); });
-      ser.addEventListener("input", ()=>{ updateProgress(); markUnsaved(); });
+  const pct = checked ? Math.round((valid/checked)*100) : 0;
+  bar.style.width = (checked ? pct : 0) + "%";
+  progTxt.textContent = valid + "/" + checked;
+}
 
-      frag.appendChild(tr);
-    });
-    tbody.appendChild(frag);
-    updateProgress();
-  }
-
-  function updateProgress(){
-    const rows = Array.from(tbody.querySelectorAll("tr"));
-    let checked=0, valid=0;
-
-    rows.forEach(tr=>{
-      const chk = tr.querySelector(".chk");
-      if(!chk) return;
-      if(chk.checked){
-        checked++;
-        const modo = tr.querySelector(".modo")?.value || "cantidad";
-        const cant = tr.querySelector(".cant");
-        const ser  = tr.querySelector(".series");
-        const seriadoEnabled = !ser.disabled;
-
-        let ok=false;
-        if(seriadoEnabled && modo==="serie"){
-          ok = !!(ser.value||"").trim();
-        }else{
-          const v = parseFloat(cant.value);
-          ok = v>0;
-        }
-        if(ok) valid++;
-      }
-    });
-
-    const pct = checked? Math.round((valid/checked)*100) : 0;
-    bar.style.width = (checked? pct:0) + "%";
-    progTxt.textContent = `${valid}/${checked}`;
-  }
 
   // ===== Modal Series =====
   function openSeriesWizard(){
@@ -622,37 +627,25 @@ const ft  = (r[COL.FIS_TEO]!=null ? r[COL.FIS_TEO] : "0").toString();
     const data = await resp.json().catch(()=>({ ok:false, error:"Respuesta inválida" }));
 
     // Limpia marcas previas
-    rows.forEach(tr=>{
-      tr.querySelector(".cant")?.classList.remove("errorCell");
-      tr.querySelector(".series")?.classList.remove("errorCell");
-    });
+rows.forEach(tr=>{
+  tr.querySelector(".cant")?.classList.remove("errorCell");
+  tr.querySelector(".series")?.classList.remove("errorCell");
+});
 
-    if(!resp.ok || data.ok === false){
-      // Marca errores por fila según "index"
-      if(Array.isArray(data.errors) && data.errors.length){
-        let firstBad = null;
-        data.errors.forEach(e=>{
-          const domIndex = filaIndexMap[e.index]; // índice del <tr> en el DOM
-          const tr = rows[domIndex];
-          if(!tr) return;
-          const cant = tr.querySelector(".cant");
-          const ser  = tr.querySelector(".series");
-          if(e.errors?.cantidad){ cant?.classList.add("errorCell"); firstBad = firstBad ?? cant; }
-          if(e.errors?.serie){ ser?.classList.add("errorCell"); firstBad = firstBad ?? ser; }
-          if(e.errors?.cuadrilla || e.errors?.codigo || e.errors?.reviso){
-            tr.classList.add("errorCell"); firstBad = firstBad ?? tr;
-          }
-        });
-        if(firstBad && firstBad.scrollIntoView){ firstBad.scrollIntoView({behavior:"smooth", block:"center"}); }
-        statusMsg.className="msg error";
-        const resumen = data.errors.map(e=>`#${e.index+1}: ${Object.keys(e.errors).join(", ")}`).join(" • ");
-        statusMsg.textContent = `El servidor rechazó algunos registros: ${resumen}`;
-      }else{
-        statusMsg.className="msg error";
-        statusMsg.textContent = `Error del servidor${data.error?`: ${data.error}`:""}.`;
-      }
-      return;
-    }
+let firstBad = null;
+data.errors.forEach(function(e){
+  const domIndex = filaIndexMap[e.index];
+  const tr = rows[domIndex];
+  if(!tr) return;
+  const cant = tr.querySelector(".cant");
+  const ser  = tr.querySelector(".series");
+  if(e.errors && e.errors.cantidad){ if(cant){ cant.classList.add("errorCell"); } firstBad = firstBad || cant; }
+  if(e.errors && e.errors.serie){    if(ser){  ser.classList.add("errorCell"); }  firstBad = firstBad || ser; }
+  if(e.errors && (e.errors.cuadrilla || e.errors.codigo || e.errors.reviso)){
+    tr.classList.add("errorCell"); firstBad = firstBad || tr;
+  }
+});
+if(firstBad && firstBad.scrollIntoView){ firstBad.scrollIntoView({behavior:"smooth", block:"center"}); }
 
     // Éxito
     statusMsg.className="msg ok";
@@ -663,8 +656,9 @@ const ft  = (r[COL.FIS_TEO]!=null ? r[COL.FIS_TEO] : "0").toString();
       const chk = tr.querySelector(".chk");
       if(chk && chk.checked){
         chk.checked = false;
-        tr.querySelector(".cant")?.value = "";
-        tr.querySelector(".series")?.value = "";
+var ci = tr.querySelector(".cant");   if(ci){ ci.value = ""; }
+var si = tr.querySelector(".series"); if(si){ si.value = ""; }
+
       }
     });
     // ya no avisamos al salir
