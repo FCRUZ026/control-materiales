@@ -255,17 +255,27 @@
   function clearUnsaved(){ hasUnsaved = false; }
 
   /* ===== FETCH A SHEETS (compat) ===== */
-  function gFetch(rangeA1){
-    var url = "https://sheets.googleapis.com/v4/spreadsheets/" + SHEET_ID +
-              "/values/" + encodeURIComponent(rangeA1) + "?key=" + API_KEY +
-              "&valueRenderOption=UNFORMATTED_VALUE&majorDimension=ROWS&_cb=" + Date.now();
-    return fetch(url).then(function(res){
-      if(!res.ok){ return res.text().then(function(t){ throw new Error("HTTP "+res.status+" "+t); }); }
-      return res.json();
-    }).then(function(data){
-      return (data && data.values) ? data.values : [];
-    });
-  }
+function gFetch(rangeA1){
+  var url = "https://sheets.googleapis.com/v4/spreadsheets/" + SHEET_ID +
+            "/values/" + encodeURIComponent(rangeA1) +
+            "?key=" + API_KEY +
+            "&valueRenderOption=UNFORMATTED_VALUE" +
+            "&majorDimension=ROWS";
+  return fetch(url, {
+    // esto ayuda a evitar caché del navegador sin romper la API
+    cache: "no-store",
+    headers: {
+      "Cache-Control": "no-cache"
+    }
+  }).then(function(res){
+    if(!res.ok){
+      return res.text().then(function(t){ throw new Error("HTTP "+res.status+" "+t); });
+    }
+    return res.json();
+  }).then(function(data){
+    return (data && data.values) ? data.values : [];
+  });
+}
 
   /* ===== CARGAS ===== */
   window.loadIngenieros = async function(){
