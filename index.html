@@ -328,6 +328,19 @@ async function loadCuadrillas(){
     console.error(e);
   }
 }
+async function loadMateriales(){
+  try{
+    // Lee la pestaña con los materiales (ajusta el rango si tu hoja tiene más/menos columnas)
+    const v = await gFetch(MATERIALS_SHEET + '!A:I');
+    // Quita la fila de encabezados
+    materiales = Array.isArray(v) ? v.slice(1) : [];
+    // (Opcional) log de verificación
+    console.log('[loadMateriales] filas:', materiales.length);
+  }catch(e){
+    console.error('[loadMateriales] ERROR:', e);
+    materiales = [];
+  }
+}
 
   function updateControls(){
     const enabled = selIngeniero.value !== "";
